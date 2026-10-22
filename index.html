@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="de" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Übungs-Abnahme FLŌ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Cairo:wght@400;600;700&display=swap">
+<style>
+/* Layout concept: sticky progress header incl. language switcher, then exercise
+   cards grouped by Kraft/HIIT/Yoga, each pairing a looping mannequin animation
+   (ported 1:1 from the app's own forward-kinematics engine) with localized
+   copy (DE/EN/AR) and a three-way sign-off control, closing with an explicit
+   confirmation step. No account, no app, no internet needed after first
+   load: every answer lives only in this browser (localStorage) and is turned
+   into a text report the trainer copies and sends back manually. This file
+   is meant to be opened directly (double-tap on a phone, or any browser) —
+   it is not hosted anywhere. */
+:root{
+  color-scheme: dark;
+  --bg:#07071A; --surface:#11112A; --surface-2:#171a3d; --border:rgba(255,255,255,.1);
+  --fg:#F4F5FA; --fg-dim:rgba(244,245,250,.64); --accent:#34D7A8; --accent-ink:#06231b;
+  --warn:#F5A524; --warn-ink:#3a2500; --danger:#F2545B; --danger-ink:#3a0a0e;
+  --figure:#CBD5E1; --figure-far:#7C8BA1; --muscle:#FB923C;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 Cairo,system-ui,sans-serif;padding:0 16px;padding-bottom:60px;padding-top:20px}
+h1,.num{font-family:Outfit,system-ui,sans-serif}
+[dir="rtl"] h1,[dir="rtl"] .num{font-family:Cairo,system-ui,sans-serif}
+.wrap{max-width:900px;margin:0 auto}
+header.top{display:flex;flex-direction:column;gap:14px;margin-bottom:22px}
+.title-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+h1{font-size:22px;font-weight:800;margin:0;letter-spacing:.2px}
+.sub{color:var(--fg-dim);font-size:13.5px;margin:2px 0 0}
+.langsw{display:flex;gap:4px;background:var(--surface-2);border-radius:99px;padding:3px;flex:0 0 auto}
+.langsw button{font:inherit;font-size:12.5px;font-weight:700;padding:6px 13px;border-radius:99px;border:none;background:transparent;color:var(--fg-dim);cursor:pointer}
+.langsw button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px}
+.info{padding:14px 16px;font-size:13.5px;color:var(--fg-dim);line-height:1.55}
+.info b{color:var(--fg);font-weight:700}
+.progress-row{display:flex;align-items:center;gap:12px;padding:14px 16px}
+.bar{flex:1;height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;min-width:80px}
+.bar-fill{height:100%;background:var(--accent);border-radius:99px;transition:width .3s}
+.progress-num{font-weight:700;font-size:13.5px;white-space:nowrap}
+.name-row{display:flex;gap:10px;align-items:center;padding:0 16px 14px;flex-wrap:wrap}
+.name-row label{font-size:13px;color:var(--fg-dim);white-space:nowrap}
+input.name{flex:1;min-width:160px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:9px 12px;color:var(--fg);font:inherit;font-size:14px}
+input.name:focus{outline:2px solid var(--accent);outline-offset:1px}
+.export-row{padding:0 16px 14px;display:flex;flex-direction:column;gap:8px}
+.export-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.export-btn{font:inherit;font-weight:700;font-size:13px;padding:9px 16px;border-radius:10px;border:none;background:var(--surface-2);color:var(--fg);cursor:pointer}
+.export-hint{font-size:12px;color:var(--fg-dim)}
+textarea.report{width:100%;min-height:110px;resize:vertical;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:9px 11px;color:var(--fg);font:12px/1.5 ui-monospace,Consolas,monospace;direction:ltr}
+.no-account{padding:14px 16px;font-size:12.5px;color:var(--fg-dim);border-top:1px solid var(--border)}
+.group-title{font-size:13px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--fg-dim);margin:30px 0 12px;padding-left:2px}
+[dir="rtl"] .group-title{letter-spacing:0;padding-left:0;padding-right:2px}
+.group-title:first-of-type{margin-top:8px}
+.grid{display:grid;grid-template-columns:1fr;gap:14px}
+.ex-card{padding:16px;display:flex;flex-direction:column;gap:12px}
+.ex-head{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;justify-content:space-between}
+.ex-title-wrap{min-width:0;flex:1}
+.ex-name{font-size:16px;font-weight:700;margin:0 0 2px}
+.ex-id{font-size:11px;color:var(--fg-dim);font-family:ui-monospace,Consolas,monospace;direction:ltr;unicode-bidi:plaintext}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.tag{font-size:11px;padding:3px 9px;border-radius:99px;background:var(--surface-2);color:var(--fg-dim);white-space:nowrap}
+.tag.diff{color:var(--fg)}
+.status-pill{font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap;background:var(--surface-2);color:var(--fg-dim)}
+.status-pill[data-s="approved"]{background:var(--accent);color:var(--accent-ink)}
+.status-pill[data-s="changes"]{background:var(--warn);color:var(--warn-ink)}
+.status-pill[data-s="remove"]{background:var(--danger);color:var(--danger-ink)}
+.body-row{display:flex;gap:16px;flex-wrap:wrap}
+.figure-box{flex:0 0 auto;width:150px;background:var(--surface-2);border-radius:12px;overflow:hidden}
+.figure-box svg{display:block;width:100%;height:auto}
+.steps{flex:1;min-width:220px;display:flex;flex-direction:column;gap:8px}
+.steps ol{margin:0;padding-inline-start:18px;display:flex;flex-direction:column;gap:4px;font-size:13.5px}
+.steps ol li::marker{color:var(--fg-dim);font-weight:700}
+.safety{font-size:12.5px;color:var(--fg-dim);background:var(--surface-2);border-radius:10px;padding:8px 10px;display:flex;gap:7px}
+.safety b{color:var(--fg);flex:0 0 auto}
+.review{border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:9px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{flex:1;min-width:120px;font:inherit;font-size:12.5px;font-weight:700;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg-dim);cursor:pointer}
+.seg button[aria-pressed="true"][data-s="approved"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.seg button[aria-pressed="true"][data-s="changes"]{background:var(--warn);color:var(--warn-ink);border-color:var(--warn)}
+.seg button[aria-pressed="true"][data-s="remove"]{background:var(--danger);color:var(--danger-ink);border-color:var(--danger)}
+textarea.notes{width:100%;resize:vertical;min-height:46px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:9px 11px;color:var(--fg);font:inherit;font-size:13px}
+textarea.notes:focus{outline:2px solid var(--accent);outline-offset:1px}
+.confirm-card{margin-top:28px;padding:18px 16px;display:flex;flex-direction:column;gap:12px;border-color:var(--accent)}
+.confirm-title{font-size:15px;font-weight:700;margin:0}
+.confirm-check{display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:var(--fg-dim);cursor:pointer}
+.confirm-check input{margin-top:3px;width:18px;height:18px;flex:0 0 auto;accent-color:var(--accent)}
+.confirm-btn{font:inherit;font-weight:700;font-size:14px;padding:12px 20px;border-radius:10px;border:none;background:var(--accent);color:var(--accent-ink);cursor:pointer;align-self:flex-start}
+.confirm-btn:disabled{opacity:.35;cursor:not-allowed}
+.confirm-status{font-size:12.5px;color:var(--accent);font-weight:700;margin:0}
+.anim-toggle{position:sticky;bottom:16px;display:flex;justify-content:flex-end}
+[dir="rtl"] .anim-toggle{justify-content:flex-start}
+.anim-btn{font:inherit;font-size:12.5px;font-weight:700;padding:9px 14px;border-radius:99px;border:1px solid var(--border);background:var(--surface);color:var(--fg);cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+@media (max-width:520px){
+  .figure-box{width:128px}
+  .ex-head{flex-direction:column}
+  .status-pill{align-self:flex-start}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="title-row">
+      <div>
+        <h1 id="pageTitle">Übungs-Abnahme FLŌ</h1>
+        <p class="sub" id="pageSub">26 Bewegungen · Mannequin-Animation + Anleitungstext zur fachlichen Prüfung</p>
+      </div>
+      <div class="langsw" id="langsw" role="group" aria-label="Sprache">
+        <button type="button" data-lang="de">DE</button>
+        <button type="button" data-lang="en">EN</button>
+        <button type="button" data-lang="ar">AR</button>
+      </div>
+    </div>
+    <div class="card info" id="infoBox"></div>
+    <div class="card">
+      <div class="progress-row">
+        <div class="bar"><div class="bar-fill" id="barFill" style="width:0%"></div></div>
+        <div class="progress-num"><span id="progNum">0</span><span id="progSuffix"> / 26 geprüft</span></div>
+      </div>
+      <div class="name-row">
+        <label for="reviewerName" id="nameLabel">Name des Trainers</label>
+        <input class="name" id="reviewerName" type="text" autocomplete="off">
+      </div>
+      <div class="export-row">
+        <div class="export-top">
+          <button type="button" class="export-btn" id="exportBtn">Bericht kopieren</button>
+          <span class="export-hint" id="exportHint"></span>
+        </div>
+        <textarea class="report" id="reportBox" readonly></textarea>
+      </div>
+      <div class="no-account" id="noAccountNote"></div>
+    </div>
+  </header>
+
+  <div id="groups"></div>
+
+  <div class="card confirm-card" id="confirmCard">
+    <p class="confirm-title" id="confirmTitle"></p>
+    <label class="confirm-check">
+      <input type="checkbox" id="confirmCheck">
+      <span id="confirmLabel"></span>
+    </label>
+    <button type="button" class="confirm-btn" id="confirmBtn" disabled></button>
+    <p class="confirm-status" id="confirmStatus"></p>
+  </div>
+</div>
+
+<div class="anim-toggle"><button class="anim-btn" id="animToggle" type="button">Animation pausieren</button></div>
+
+<script>
+(function(){
+"use strict";
+
+var EXERCISES = [{"id":"biceps-curl","category":"strength","view":"side","contact":["feet"],"cycleMs":3400,"keyframes":[{"t":0,"pose":{"torso":0,"armL":[4,0],"armR":[4,0],"legL":[0,0],"legR":[0,0]}},{"t":0.45,"pose":{"torso":0,"armL":[4,138],"armR":[4,138],"legL":[0,0],"legR":[0,0]}},{"t":0.55,"pose":{"torso":0,"armL":[4,138],"armR":[4,138],"legL":[0,0],"legR":[0,0]}},{"t":1,"pose":{"torso":0,"armL":[4,0],"armR":[4,0],"legL":[0,0],"legR":[0,0]}}],"muscles":["biceps","forearms"],"equipment":"dumbbell","sets":3,"reps":12,"holdSeconds":null,"name":{"de":"Bizeps-Curl","en":"Biceps curl","ar":"تمرين البايسبس"},"steps":{"de":["Stell dich hüftbreit hin, in jeder Hand eine Kurzhantel, die Arme hängen locker.","Halte die Oberarme ruhig am Körper und beuge die Ellenbogen, bis die Hanteln fast die Schultern erreichen.","Senke sie langsam und kontrolliert wieder ab. Atme beim Anheben aus."],"en":["Stand hip-width apart with a dumbbell in each hand, arms hanging relaxed.","Keep the upper arms still by your sides and bend the elbows until the dumbbells nearly reach the shoulders.","Lower them slowly and under control. Breathe out as you lift."],"ar":["قف والقدمان بعرض الحوض وفي كل يد دمبل، والذراعان مسترخيتان.","أبقِ العضدين ثابتين بجانب الجسم وثنِ المرفقين حتى يقترب الدمبل من الكتفين.","أنزل الوزن ببطء وبتحكّم. أخرج الزفير أثناء الرفع."]},"safety":{"de":"Wähle ein Gewicht, das du sauber bewegen kannst. Schwing nicht mit dem Rücken. Bei Schmerzen im Ellenbogen abbrechen.","en":"Pick a weight you can move cleanly. Do not swing with your back. Stop if the elbow hurts.","ar":"اختر وزناً تستطيع تحريكه بشكل صحيح. لا تتأرجح بالظهر. توقّف إذا شعرت بألم في المرفق."},"difficulty":"beginner","bodyAreas":["biceps","forearms"]},{"id":"lateral-raise","category":"strength","view":"front","contact":["feet"],"cycleMs":3400,"keyframes":[{"t":0,"pose":{"torso":0,"armL":[6,8],"armR":[6,8],"legL":[4,0],"legR":[4,0]}},{"t":0.45,"pose":{"torso":0,"armL":[86,10],"armR":[86,10],"legL":[4,0],"legR":[4,0]}},{"t":0.55,"pose":{"torso":0,"armL":[86,10],"armR":[86,10],"legL":[4,0],"legR":[4,0]}},{"t":1,"pose":{"torso":0,"armL":[6,8],"armR":[6,8],"legL":[4,0],"legR":[4,0]}}],"muscles":["shoulders"],"equipment":"dumbbell","sets":3,"reps":12,"holdSeconds":null,"name":{"de":"Seitheben","en":"Lateral raise","ar":"رفع جانبي"},"steps":{"de":["Stell dich aufrecht hin, in jeder Hand eine leichte Kurzhantel neben dem Körper.","Hebe die Arme mit leicht gebeugten Ellenbogen seitlich bis auf Schulterhöhe.","Senke sie langsam ab, ohne die Schultern hochzuziehen."],"en":["Stand tall with a light dumbbell in each hand beside your body.","With slightly bent elbows, raise the arms out to the sides up to shoulder height.","Lower them slowly without shrugging the shoulders."],"ar":["قف مستقيماً وفي كل يد دمبل خفيف بجانب الجسم.","ارفع الذراعين جانباً حتى مستوى الكتفين مع ثني بسيط في المرفقين.","أنزلهما ببطء دون رفع الكتفين."]},"safety":{"de":"Nimm ein leichtes Gewicht. Nicht über Schulterhöhe heben. Bei Schulterschmerzen abbrechen.","en":"Use a light weight. Do not lift above shoulder height. Stop if the shoulder hurts.","ar":"استخدم وزناً خفيفاً. لا ترفع فوق مستوى الكتفين. توقّف عند ألم الكتف."},"difficulty":"beginner","bodyAreas":["shoulders"]},{"id":"overhead-press","category":"strength","view":"front","contact":["feet"],"cycleMs":3600,"keyframes":[{"t":0,"pose":{"torso":0,"armL":[80,-100],"armR":[80,-100],"legL":[4,0],"legR":[4,0]}},{"t":0.45,"pose":{"torso":0,"armL":[166,0],"armR":[166,0],"legL":[4,0],"legR":[4,0]}},{"t":0.55,"pose":{"torso":0,"armL":[166,0],"armR":[166,0],"legL":[4,0],"legR":[4,0]}},{"t":1,"pose":{"torso":0,"armL":[80,-100],"armR":[80,-100],"legL":[4,0],"legR":[4,0]}}],"muscles":["shoulders","triceps"],"equipment":"dumbbell","sets":3,"reps":10,"holdSeconds":null,"name":{"de":"Schulterdrücken","en":"Overhead press","ar":"ضغط الكتف"},"steps":{"de":["Stell dich fest hin, die Hanteln auf Schulterhöhe, die Unterarme senkrecht.","Drücke die Hanteln gerade nach oben, bis die Arme fast gestreckt sind.","Senke sie kontrolliert zurück auf Schulterhöhe. Spann den Bauch an, das Hohlkreuz bleibt aus."],"en":["Stand firmly with the dumbbells at shoulder height, forearms vertical.","Press the dumbbells straight up until the arms are nearly straight.","Lower them under control to shoulder height. Brace your abs and avoid arching the lower back."],"ar":["قف بثبات والدمبلز عند مستوى الكتفين والساعدان عموديان.","ادفع الدمبلز للأعلى بشكل مستقيم حتى تقترب الذراعان من الاستقامة.","أنزلهما بتحكّم إلى مستوى الكتفين. شدّ عضلات البطن وتجنّب تقوّس أسفل الظهر."]},"safety":{"de":"Technik vor Gewicht. Atme weiter. Bei Schulter- oder Nackenschmerzen abbrechen.","en":"Form before weight. Keep breathing. Stop with shoulder or neck pain.","ar":"الأسلوب قبل الوزن. واصل التنفّس. توقّف عند ألم الكتف أو الرقبة."},"difficulty":"intermediate","bodyAreas":["shoulders","triceps"]},{"id":"bent-over-row","category":"strength","view":"side","contact":["feet"],"cycleMs":3600,"keyframes":[{"t":0,"pose":{"torso":62,"armL":[0,0],"armR":[0,0],"legL":[16,32],"legR":[16,32],"head":-38}},{"t":0.45,"pose":{"torso":62,"armL":[-58,58],"armR":[-58,58],"legL":[16,32],"legR":[16,32],"head":-38}},{"t":0.55,"pose":{"torso":62,"armL":[-58,58],"armR":[-58,58],"legL":[16,32],"legR":[16,32],"head":-38}},{"t":1,"pose":{"torso":62,"armL":[0,0],"armR":[0,0],"legL":[16,32],"legR":[16,32],"head":-38}}],"muscles":["upperBack","biceps"],"equipment":"dumbbell","sets":3,"reps":12,"holdSeconds":null,"name":{"de":"Vorgebeugtes Rudern","en":"Bent-over row","ar":"التجديف بالانحناء"},"steps":{"de":["Beuge dich mit geradem Rücken aus der Hüfte nach vorn, die Knie leicht gebeugt, die Hanteln hängen unter den Schultern.","Ziehe die Ellenbogen nach hinten oben, bis die Hanteln an die Rippen kommen. Drücke dabei die Schulterblätter zusammen.","Senke die Hanteln langsam wieder ab."],"en":["Hinge forward from the hips with a straight back and slightly bent knees, dumbbells hanging under the shoulders.","Pull the elbows back and up until the dumbbells reach your ribs, squeezing the shoulder blades together.","Lower the dumbbells slowly."],"ar":["انحنِ للأمام من الحوض مع ظهر مستقيم وركبتين مثنيتين قليلاً، والدمبلز معلّقان تحت الكتفين.","اسحب المرفقين للخلف وللأعلى حتى يصل الدمبلز إلى الأضلاع مع ضمّ لوحَي الكتف.","أنزل الدمبلز ببطء."]},"safety":{"de":"Halte den Rücken gerade und den Nacken lang. Bei Rückenschmerzen sofort abbrechen.","en":"Keep your back straight and neck long. Stop right away with back pain.","ar":"أبقِ ظهرك مستقيماً ورقبتك طويلة. توقّف فوراً عند ألم الظهر."},"difficulty":"intermediate","bodyAreas":["back","biceps"]},{"id":"bodyweight-squat","category":"strength","view":"side","contact":["feet"],"cycleMs":4000,"keyframes":[{"t":0,"pose":{"torso":0,"armL":[0,0],"armR":[0,0],"legL":[0,0],"legR":[0,0]}},{"t":0.5,"pose":{"torso":38,"armL":[82,0],"armR":[82,0],"legL":[100,120],"legR":[100,120]}},{"t":0.6,"pose":{"torso":38,"armL":[82,0],"armR":[82,0],"legL":[100,120],"legR":[100,120]}},{"t":1,"pose":{"torso":0,"armL":[0,0],"armR":[0,0],"legL":[0,0],"legR":[0,0]}}],"muscles":["quads","glutes"],"equipment":null,"sets":3,"reps":15,"holdSeconds":null,"name":{"de":"Kniebeuge","en":"Bodyweight squat","ar":"القرفصاء"},"steps":{"de":["Stell dich schulterbreit hin, die Fußspitzen zeigen leicht nach außen.","Schiebe die Hüfte nach hinten und unten, als würdest du dich setzen. Die Knie folgen den Zehen, die Fersen bleiben am Boden.","Drücke dich über die Füße wieder nach oben. Die Arme dürfen zum Ausbalancieren nach vorn."],"en":["Stand shoulder-width apart with the toes turned slightly out.","Push the hips back and down as if sitting. The knees follow the toes and the heels stay down.","Press through your feet to stand back up. The arms may reach forward for balance."],"ar":["قف والقدمان بعرض الكتفين وأصابع القدمين مائلة قليلاً للخارج.","ادفع الحوض للخلف وللأسفل كأنك تجلس. تتبع الركبتان اتجاه الأصابع وتبقى الكعبان على الأرض.","ادفع بالقدمين للعودة إلى الوقوف. يمكن مدّ الذراعين للأمام للتوازن."]},"safety":{"de":"Geh nur so tief, wie es schmerzfrei und mit geradem Rücken geht. Bei Knieschmerzen weniger tief.","en":"Go only as deep as feels pain-free with a straight back. Go less deep with knee pain.","ar":"انزل بالقدر الذي لا يسبب ألماً مع ظهر مستقيم. انزل أقل عند ألم الركبة."},"difficulty":"beginner","bodyAreas":["legs","glutes"]},{"id":"push-up","category":"strength","view":"side","contact":["hands","feet"],"cycleMs":3600,"keyframes":[{"t":0,"pose":{"torso":70.45,"armL":[0,0],"armR":[0,0],"legL":[-70.45,0],"legR":[-70.45,0],"foot":20}},{"t":0.5,"pose":{"torso":81.6,"armL":[-80,80],"armR":[-80,80],"legL":[-81.6,0],"legR":[-81.6,0],"foot":20}},{"t":0.6,"pose":{"torso":81.6,"armL":[-80,80],"armR":[-80,80],"legL":[-81.6,0],"legR":[-81.6,0],"foot":20}},{"t":1,"pose":{"torso":70.45,"armL":[0,0],"armR":[0,0],"legL":[-70.45,0],"legR":[-70.45,0],"foot":20}}],"muscles":["chest","triceps","shoulders"],"equipment":null,"sets":3,"reps":10,"holdSeconds":null,"name":{"de":"Liegestütz","en":"Push-up","ar":"تمرين الضغط"},"steps":{"de":["Stütze dich auf die Hände unter den Schultern, der Körper bildet eine gerade Linie von Kopf bis Ferse.","Beuge die Ellenbogen und senke die Brust kontrolliert Richtung Boden, die Ellenbogen etwa 45 Grad zum Körper.","Drücke dich kraftvoll zurück nach oben, ohne die Hüfte durchhängen zu lassen."],"en":["Support yourself on your hands under the shoulders, the body forming a straight line from head to heels.","Bend the elbows and lower the chest under control toward the floor, elbows about 45 degrees from the body.","Press back up strongly without letting the hips sag."],"ar":["استند على يديك تحت الكتفين بحيث يشكّل الجسم خطاً مستقيماً من الرأس إلى الكعبين.","ثنِ المرفقين وأنزل الصدر بتحكّم نحو الأرض والمرفقان بزاوية 45 درجة تقريباً عن الجسم.","ادفع للأعلى بقوة دون أن يهبط الحوض."]},"safety":{"de":"Zu schwer? Stütze die Knie ab oder nutze einen erhöhten Halt. Bei Handgelenk- oder Schulterschmerzen abbrechen.","en":"Too hard? Rest the knees or use a raised surface. Stop with wrist or shoulder pain.","ar":"صعب؟ استند على الركبتين أو على سطح مرتفع. توقّف عند ألم المعصم أو الكتف."},"difficulty":"intermediate","bodyAreas":["chest","triceps","shoulders"]},{"id":"plank","category":"strength","view":"side","contact":["hands","feet"],"cycleMs":5000,"keyframes":[{"t":0,"pose":{"torso":82.3,"armL":[0,90],"armR":[0,90],"legL":[-82.3,0],"legR":[-82.3,0],"foot":20}},{"t":0.5,"pose":{"torso":82.9,"armL":[0,90],"armR":[0,90],"legL":[-82.9,0],"legR":[-82.9,0],"foot":20}},{"t":1,"pose":{"torso":82.3,"armL":[0,90],"armR":[0,90],"legL":[-82.3,0],"legR":[-82.3,0],"foot":20}}],"muscles":["abs","shoulders","glutes"],"equipment":null,"sets":3,"reps":null,"holdSeconds":30,"name":{"de":"Unterarmstütz (Plank)","en":"Forearm plank","ar":"البلانك"},"steps":{"de":["Stütze dich auf die Unterarme, die Ellenbogen genau unter den Schultern.","Strecke die Beine, hebe die Knie und halte den Körper in einer geraden Linie. Bauch und Gesäß sind angespannt.","Atme ruhig weiter und halte die Position."],"en":["Support yourself on your forearms, elbows directly under the shoulders.","Extend the legs, lift the knees and keep the body in one straight line. Abs and glutes are tight.","Keep breathing calmly and hold the position."],"ar":["استند على الساعدين والمرفقان تحت الكتفين مباشرة.","مدّ الساقين وارفع الركبتين وأبقِ الجسم في خط مستقيم مع شدّ البطن والأرداف.","واصل التنفّس بهدوء وثبّت الوضعية."]},"safety":{"de":"Lass die Hüfte nicht durchhängen. Bei Rückenschmerzen die Knie ablegen oder aufhören.","en":"Do not let the hips sag. With back pain, rest the knees or stop.","ar":"لا تدع الحوض يهبط. عند ألم الظهر ضع الركبتين على الأرض أو توقّف."},"difficulty":"beginner","bodyAreas":["core","shoulders"]},{"id":"lunge","category":"strength","view":"side","contact":["feet"],"cycleMs":4200,"keyframes":[{"t":0,"pose":{"torso":0,"armL":[0,0],"armR":[0,0],"legL":[0,0],"legR":[0,0]}},{"t":0.5,"pose":{"torso":4,"armL":[0,0],"armR":[0,0],"legL":[80,88],"legR":[-5,90],"footR":25}},{"t":0.6,"pose":{"torso":4,"armL":[0,0],"armR":[0,0],"legL":[80,88],"legR":[-5,90],"footR":25}},{"t":1,"pose":{"torso":0,"armL":[0,0],"armR":[0,0],"legL":[0,0],"legR":[0,0]}}],"muscles":["quads","glutes"],"equipment":null,"sets":3,"reps":10,"holdSeconds":null,"name":{"de":"Ausfallschritt","en":"Lunge","ar":"الطعنة"},"steps":{"de":["Stell dich aufrecht hin und mache einen großen Schritt nach vorn.","Senke dich, bis beide Knie etwa im rechten Winkel gebeugt sind. Das vordere Knie bleibt über dem Fuß, der Oberkörper aufrecht.","Drücke dich vom vorderen Fuß zurück in den Stand und wechsle die Seite."],"en":["Stand tall and take a big step forward.","Lower until both knees are bent at about a right angle. The front knee stays over the foot and the torso upright.","Push back through the front foot to standing and switch sides."],"ar":["قف مستقيماً وخذ خطوة كبيرة للأمام.","انزل حتى تنثني الركبتان بزاوية قائمة تقريباً. تبقى الركبة الأمامية فوق القدم والجذع مستقيماً.","ادفع بالقدم الأمامية للعودة إلى الوقوف ثم بدّل الجانب."]},"safety":{"de":"Halte das Gleichgewicht, stütze dich bei Bedarf an einer Wand ab. Bei Knieschmerzen weniger tief.","en":"Keep your balance and use a wall for support if needed. Go less deep with knee pain.","ar":"حافظ على توازنك واستند إلى حائط عند الحاجة. انزل أقل عند ألم الركبة."},"difficulty":"beginner","bodyAreas":["legs","glutes"]},{"id":"romanian-deadlift","category":"strength","view":"side","contact":["feet"],"cycleMs":4200,"keyframes":[{"t":0,"pose":{"torso":0,"armL":[0,0],"armR":[0,0],"legL":[0,0],"legR":[0,0]}},{"t":0.5,"pose":{"torso":68,"armL":[0,0],"armR":[0,0],"legL":[-18,24],"legR":[-18,24],"head":-30}},{"t":0.6,"pose":{"torso":68,"armL":[0,0],"armR":[0,0],"legL":[-18,24],"legR":[-18,24],"head":-30}},{"t":1,"pose":{"torso":0,"armL":[0,0],"armR":[0,0],"legL":[0,0],"legR":[0,0]}}],"muscles":["hamstrings","glutes","lowerBack"],"equipment":"dumbbell","sets":3,"reps":10,"holdSeconds":null,"name":{"de":"Rumänisches Kreuzheben","en":"Romanian deadlift","ar":"الرفعة الميتة الرومانية"},"steps":{"de":["Stell dich hüftbreit hin, die Hanteln vor den Oberschenkeln, die Knie leicht gebeugt.","Schiebe die Hüfte nach hinten und lass den Oberkörper mit geradem Rücken nach vorn kippen. Die Hanteln gleiten an den Beinen entlang.","Spanne das Gesäß an und richte dich wieder auf."],"en":["Stand hip-width apart with the dumbbells in front of the thighs, knees slightly bent.","Push the hips back and let the torso tip forward with a straight back. The dumbbells slide along the legs.","Squeeze the glutes and stand back up."],"ar":["قف والقدمان بعرض الحوض والدمبلز أمام الفخذين والركبتان مثنيتان قليلاً.","ادفع الحوض للخلف ودع الجذع يميل للأمام مع ظهر مستقيم. ينزلق الدمبلز على الساقين.","شدّ الأرداف وعد إلى الوقوف."]},"safety":{"de":"Der Rücken bleibt immer gerade. Geh nur so tief, wie du den Rücken halten kannst. Bei Rückenschmerzen abbrechen.","en":"Keep the back straight at all times. Go only as low as you can hold your back. Stop with back pain.","ar":"أبقِ الظهر مستقيماً دائماً. انزل بقدر ما تستطيع الحفاظ على ظهرك. توقّف عند ألم الظهر."},"difficulty":"intermediate","bodyAreas":["hamstrings","glutes","lower back"]},{"id":"triceps-extension","category":"strength","view":"side","contact":["feet"],"cycleMs":3600,"keyframes":[{"t":0,"pose":{"torso":0,"armL":[178,0],"armR":[178,0],"legL":[0,0],"legR":[0,0]}},{"t":0.5,"pose":{"torso":0,"armL":[178,140],"armR":[178,140],"legL":[0,0],"legR":[0,0]}},{"t":0.6,"pose":{"torso":0,"armL":[178,140],"armR":[178,140],"legL":[0,0],"legR":[0,0]}},{"t":1,"pose":{"torso":0,"armL":[178,0],"armR":[178,0],"legL":[0,0],"legR":[0,0]}}],"muscles":["triceps"],"equipment":"dumbbell","sets":3,"reps":12,"holdSeconds":null,"name":{"de":"Trizeps-Strecken über Kopf","en":"Overhead triceps extension","ar":"تمديد الترايسبس فوق الرأس"},"steps":{"de":["Stell dich aufrecht hin und halte eine Kurzhantel mit beiden Händen über dem Kopf, die Arme gestreckt.","Beuge nur die Ellenbogen und senke die Hantel hinter den Kopf. Die Oberarme bleiben nah am Kopf und ruhig.","Strecke die Arme wieder nach oben."],"en":["Stand tall and hold one dumbbell with both hands overhead, arms straight.","Bend only the elbows and lower the dumbbell behind your head. The upper arms stay close to the head and still.","Straighten the arms overhead again."],"ar":["قف مستقيماً وامسك دمبلاً واحداً بكلتا اليدين فوق الرأس والذراعان ممدودتان.","ثنِ المرفقين فقط وأنزل الدمبل خلف الرأس. يبقى العضدان قريبين من الرأس وثابتين.","مدّ الذراعين للأعلى مرة أخرى."]},"safety":{"de":"Nimm ein leichtes Gewicht und halte den Rumpf angespannt. Bei Ellenbogen- oder Schulterschmerzen abbrechen.","en":"Use a light weight and keep the trunk braced. Stop with elbow or shoulder pain.","ar":"استخدم وزناً خفيفاً وأبقِ الجذع مشدوداً. توقّف عند ألم المرفق أو الكتف."},"difficulty":"beginner","bodyAreas":["triceps"]},{"id":"glute-bridge","category":"strength","view":"side","contact":["feet","shoulders"],"cycleMs":4000,"keyframes":[{"t":0,"pose":{"torso":-80.95,"armL":[90,0],"armR":[90,0],"legL":[145,114],"legR":[145,114]}},{"t":0.5,"pose":{"torso":-101.2,"armL":[90,0],"armR":[90,0],"legL":[110,80],"legR":[110,80]}},{"t":0.6,"pose":{"torso":-101.2,"armL":[90,0],"armR":[90,0],"legL":[110,80],"legR":[110,80]}},{"t":1,"pose":{"torso":-80.95,"armL":[90,0],"armR":[90,0],"legL":[145,114],"legR":[145,114]}}],"muscles":["glutes","hamstrings"],"equipment":null,"sets":3,"reps":12,"holdSeconds":null,"name":{"de":"Beckenheben (Glute Bridge)","en":"Glute bridge","ar":"جسر الأرداف"},"steps":{"de":["Lege dich auf den Rücken, die Knie gebeugt, die Füße hüftbreit am Boden, die Arme neben dem Körper.","Drücke die Fersen in den Boden und hebe die Hüfte, bis Schultern, Hüfte und Knie eine Linie bilden.","Halte kurz und senke die Hüfte langsam wieder ab."],"en":["Lie on your back with knees bent, feet hip-width apart on the floor, arms beside the body.","Press the heels into the floor and lift the hips until shoulders, hips and knees form a line.","Hold briefly and lower the hips slowly."],"ar":["استلقِ على ظهرك والركبتان مثنيتان والقدمان بعرض الحوض على الأرض والذراعان بجانب الجسم.","اضغط بالكعبين على الأرض وارفع الحوض حتى تشكّل الكتفان والحوض والركبتان خطاً واحداً.","اثبت لحظة ثم أنزل الحوض ببطء."]},"safety":{"de":"Hebe nur so hoch, dass der Rücken nicht ins Hohlkreuz geht. Bei Rückenschmerzen aufhören.","en":"Lift only as high as the lower back does not arch. Stop with back pain.","ar":"ارفع بقدر ما لا يتقوّس أسفل الظهر. توقّف عند ألم الظهر."},"difficulty":"beginner","bodyAreas":["glutes","hamstrings"]},{"id":"jumping-jack","category":"hiit","view":"front","contact":["feet"],"cycleMs":1600,"keyframes":[{"t":0,"pose":{"torso":0,"armL":[5,0],"armR":[5,0],"legL":[3,0],"legR":[3,0]}},{"t":0.2,"pose":{"torso":0,"armL":[80,0],"armR":[80,0],"legL":[14,0],"legR":[14,0],"lift":14,"foot":60}},{"t":0.4,"pose":{"torso":0,"armL":[160,0],"armR":[160,0],"legL":[24,0],"legR":[24,0]}},{"t":0.6,"pose":{"torso":0,"armL":[160,0],"armR":[160,0],"legL":[24,0],"legR":[24,0]}},{"t":0.8,"pose":{"torso":0,"armL":[80,0],"armR":[80,0],"legL":[14,0],"legR":[14,0],"lift":14,"foot":60}},{"t":1,"pose":{"torso":0,"armL":[5,0],"armR":[5,0],"legL":[3,0],"legR":[3,0]}}],"muscles":["calves","shoulders","quads"],"equipment":null,"sets":4,"reps":null,"holdSeconds":30,"name":{"de":"Hampelmann","en":"Jumping jack","ar":"قفز الجاك"},"steps":{"de":["Stell dich aufrecht hin, die Füße zusammen, die Arme am Körper.","Springe mit den Füßen auseinander und hebe gleichzeitig die Arme seitlich über den Kopf.","Springe zurück in die Ausgangsposition. Lande weich auf dem Vorfuß."],"en":["Stand tall with feet together and arms by your sides.","Jump the feet apart while raising the arms out to the sides and overhead.","Jump back to the start. Land softly on the balls of your feet."],"ar":["قف مستقيماً والقدمان معاً والذراعان بجانب الجسم.","اقفز بالقدمين للخارج مع رفع الذراعين جانباً فوق الرأس.","اقفز للعودة إلى الوضع الأول. اهبط بلطف على مقدمة القدم."]},"safety":{"de":"Weiche Landung, Knie leicht gebeugt. Bei Gelenkschmerzen ohne Sprung (Schritt zur Seite) ausführen.","en":"Land softly with slightly bent knees. With joint pain, do it without jumping (step out to the side).","ar":"اهبط بلطف مع ثني بسيط للركبتين. عند ألم المفاصل نفّذها دون قفز (خطوة جانبية)."},"difficulty":"beginner","bodyAreas":["full body","calves"]},{"id":"high-knees","category":"hiit","view":"side","contact":["feet"],"cycleMs":1300,"keyframes":[{"t":0,"pose":{"torso":6,"armL":[-45,95],"armR":[45,95],"legL":[88,95],"legR":[-6,0]}},{"t":0.25,"pose":{"torso":6,"armL":[0,95],"armR":[0,95],"legL":[40,60],"legR":[40,60],"lift":8}},{"t":0.5,"pose":{"torso":6,"armL":[45,95],"armR":[-45,95],"legL":[-6,0],"legR":[88,95]}},{"t":0.75,"pose":{"torso":6,"armL":[0,95],"armR":[0,95],"legL":[40,60],"legR":[40,60],"lift":8}},{"t":1,"pose":{"torso":6,"armL":[-45,95],"armR":[45,95],"legL":[88,95],"legR":[-6,0]}}],"muscles":["quads","hipFlexors","abs"],"equipment":null,"sets":4,"reps":null,"holdSeconds":30,"name":{"de":"Kniehebelauf","en":"High knees","ar":"رفع الركبتين"},"steps":{"de":["Stell dich aufrecht hin und laufe auf der Stelle.","Ziehe bei jedem Schritt das Knie bis etwa auf Hüfthöhe hoch und schwinge die Arme im Gegentakt mit.","Bleibe auf dem Vorfuß, der Oberkörper aufrecht, das Tempo zügig."],"en":["Stand tall and run on the spot.","With every step, drive the knee up to about hip height and swing the arms in opposition.","Stay on the balls of the feet with an upright torso at a brisk pace."],"ar":["قف مستقيماً واركض في المكان.","مع كل خطوة ارفع الركبة إلى مستوى الحوض تقريباً وحرّك الذراعين بالتبادل.","ابقَ على مقدمة القدمين والجذع مستقيم والإيقاع سريع."]},"safety":{"de":"Beginne langsam und steigere das Tempo. Bei Schwindel oder Brustschmerz sofort aufhören.","en":"Start slowly and build up the pace. Stop immediately with dizziness or chest pain.","ar":"ابدأ ببطء وزد الإيقاع تدريجياً. توقّف فوراً عند الدوخة أو ألم الصدر."},"difficulty":"intermediate","bodyAreas":["legs","core"]},{"id":"butt-kicks","category":"hiit","view":"side","contact":["feet"],"cycleMs":1300,"keyframes":[{"t":0,"pose":{"torso":8,"armL":[-40,95],"armR":[40,95],"legL":[-4,140],"legR":[8,0],"footL":60}},{"t":0.25,"pose":{"torso":8,"armL":[0,95],"armR":[0,95],"legL":[0,60],"legR":[0,60],"lift":8}},{"t":0.5,"pose":{"torso":8,"armL":[40,95],"armR":[-40,95],"legL":[8,0],"legR":[-4,140],"footR":60}},{"t":0.75,"pose":{"torso":8,"armL":[0,95],"armR":[0,95],"legL":[0,60],"legR":[0,60],"lift":8}},{"t":1,"pose":{"torso":8,"armL":[-40,95],"armR":[40,95],"legL":[-4,140],"legR":[8,0],"footL":60}}],"muscles":["hamstrings","calves"],"equipment":null,"sets":4,"reps":null,"holdSeconds":30,"name":{"de":"Fersenkick","en":"Butt kicks","ar":"ركل الأرداف"},"steps":{"de":["Stell dich aufrecht hin und laufe auf der Stelle.","Ziehe bei jedem Schritt die Ferse in Richtung Gesäß.","Halte die Knie nah beieinander, den Oberkörper aufrecht und schwinge die Arme locker mit."],"en":["Stand tall and jog on the spot.","With every step, kick the heel toward the buttocks.","Keep the knees close together, the torso upright and swing the arms loosely."],"ar":["قف مستقيماً واركض في المكان.","مع كل خطوة اسحب الكعب نحو الأرداف.","أبقِ الركبتين قريبتين والجذع مستقيماً وحرّك الذراعين بحرية."]},"safety":{"de":"Locker bleiben, nicht überstrecken. Bei Knieschmerzen aufhören.","en":"Stay loose and do not overextend. Stop with knee pain.","ar":"ابقَ مسترخياً ولا تبالغ في المدّ. توقّف عند ألم الركبة."},"difficulty":"beginner","bodyAreas":["hamstrings","calves"]},{"id":"mountain-climber","category":"hiit","view":"side","contact":["hands","feet"],"cycleMs":1200,"keyframes":[{"t":0,"pose":{"torso":70.45,"armL":[0,0],"armR":[0,0],"legL":[115,100],"legR":[-70.45,0],"foot":20}},{"t":0.25,"pose":{"torso":70.45,"armL":[0,0],"armR":[0,0],"legL":[40,90],"legR":[-15,90],"foot":20}},{"t":0.5,"pose":{"torso":70.45,"armL":[0,0],"armR":[0,0],"legL":[-70.45,0],"legR":[115,100],"foot":20}},{"t":0.75,"pose":{"torso":70.45,"armL":[0,0],"armR":[0,0],"legL":[-15,90],"legR":[40,90],"foot":20}},{"t":1,"pose":{"torso":70.45,"armL":[0,0],"armR":[0,0],"legL":[115,100],"legR":[-70.45,0],"foot":20}}],"muscles":["abs","hipFlexors","shoulders"],"equipment":null,"sets":4,"reps":null,"holdSeconds":30,"name":{"de":"Bergsteiger","en":"Mountain climber","ar":"تسلّق الجبل"},"steps":{"de":["Gehe in den Stütz auf den Händen unter den Schultern, der Körper bildet eine gerade Linie.","Ziehe abwechselnd ein Knie zur Brust, als würdest du auf der Stelle klettern.","Halte die Hüfte tief und den Bauch angespannt. Atme gleichmäßig."],"en":["Get into a high plank with hands under the shoulders, the body in a straight line.","Alternately drive one knee toward the chest as if climbing on the spot.","Keep the hips low and the abs tight. Breathe evenly."],"ar":["خذ وضعية البلانك العالي واليدان تحت الكتفين والجسم في خط مستقيم.","اسحب إحدى الركبتين نحو الصدر بالتبادل كأنك تتسلّق في المكان.","أبقِ الحوض منخفضاً والبطن مشدوداً وتنفّس بانتظام."]},"safety":{"de":"Langsamer, wenn die Hüfte hochgeht oder der Rücken durchhängt. Bei Handgelenk- oder Schulterschmerzen aufhören.","en":"Slow down if the hips rise or the back sags. Stop with wrist or shoulder pain.","ar":"خفّف السرعة إذا ارتفع الحوض أو هبط الظهر. توقّف عند ألم المعصم أو الكتف."},"difficulty":"intermediate","bodyAreas":["core","shoulders","legs"]},{"id":"squat-jump","category":"hiit","view":"side","contact":["feet"],"cycleMs":2000,"keyframes":[{"t":0,"pose":{"torso":0,"armL":[0,0],"armR":[0,0],"legL":[0,0],"legR":[0,0]}},{"t":0.3,"pose":{"torso":38,"armL":[82,0],"armR":[82,0],"legL":[100,120],"legR":[100,120]}},{"t":0.5,"pose":{"torso":4,"armL":[155,0],"armR":[155,0],"legL":[0,0],"legR":[0,0],"lift":17,"foot":35}},{"t":0.7,"pose":{"torso":30,"armL":[60,0],"armR":[60,0],"legL":[85,105],"legR":[85,105]}},{"t":1,"pose":{"torso":0,"armL":[0,0],"armR":[0,0],"legL":[0,0],"legR":[0,0]}}],"muscles":["quads","glutes","calves"],"equipment":null,"sets":4,"reps":10,"holdSeconds":null,"name":{"de":"Sprung-Kniebeuge","en":"Squat jump","ar":"قفز القرفصاء"},"steps":{"de":["Gehe in eine Kniebeuge, die Hüfte nach hinten, der Rücken gerade.","Springe explosiv nach oben und strecke dabei den Körper und die Arme.","Lande weich mit gebeugten Knien und gehe direkt in die nächste Kniebeuge."],"en":["Lower into a squat with the hips back and a straight back.","Jump up explosively, extending the body and arms.","Land softly with bent knees and go straight into the next squat."],"ar":["انزل في وضع القرفصاء والحوض للخلف والظهر مستقيم.","اقفز للأعلى بقوة مع مدّ الجسم والذراعين.","اهبط بلطف مع ثني الركبتين وانتقل مباشرة إلى القرفصاء التالية."]},"safety":{"de":"Nur für Geübte. Weiche Landung, Knie in Zehenrichtung. Bei Knie- oder Rückenschmerzen aufhören.","en":"For experienced people only. Land softly with knees in line with the toes. Stop with knee or back pain.","ar":"للممارسين المتمرّسين فقط. اهبط بلطف والركبتان باتجاه الأصابع. توقّف عند ألم الركبة أو الظهر."},"difficulty":"advanced","bodyAreas":["legs","glutes","calves"]},{"id":"mountain-pose","category":"yoga","view":"front","contact":["feet"],"cycleMs":7000,"keyframes":[{"t":0,"pose":{"torso":0,"armL":[5,0],"armR":[5,0],"legL":[3,0],"legR":[3,0]}},{"t":0.35,"pose":{"torso":0,"armL":[172,0],"armR":[172,0],"legL":[3,0],"legR":[3,0]}},{"t":0.65,"pose":{"torso":0,"armL":[172,0],"armR":[172,0],"legL":[3,0],"legR":[3,0]}},{"t":1,"pose":{"torso":0,"armL":[5,0],"armR":[5,0],"legL":[3,0],"legR":[3,0]}}],"muscles":["shoulders","upperBack","abs"],"equipment":null,"sets":1,"reps":null,"holdSeconds":30,"name":{"de":"Berghaltung mit erhobenen Armen","en":"Mountain pose with raised arms","ar":"وضعية الجبل مع رفع الذراعين"},"steps":{"de":["Stell dich mit den Füßen hüftbreit hin, das Gewicht liegt gleichmäßig auf beiden Füßen.","Atme ein und hebe die Arme seitlich nach oben, die Handflächen zeigen zueinander. Strecke dich lang.","Atme aus und senke die Arme langsam. Wiederhole in deinem Atemrhythmus."],"en":["Stand with the feet hip-width apart, weight even on both feet.","Breathe in and raise the arms out to the sides and up, palms facing each other. Grow tall.","Breathe out and lower the arms slowly. Repeat with your breath."],"ar":["قف والقدمان بعرض الحوض ووزن الجسم موزّع بالتساوي.","خذ شهيقاً وارفع الذراعين جانباً وللأعلى وراحتاك متقابلتان. تمدّد للأعلى.","أخرج الزفير وأنزل الذراعين ببطء. كرّر مع إيقاع نفَسك."]},"safety":{"de":"Schultern locker lassen. Bei Schwindel die Arme nur bis Schulterhöhe heben.","en":"Keep the shoulders relaxed. If you feel dizzy, raise the arms only to shoulder height.","ar":"أبقِ الكتفين مسترخيين. عند الدوخة ارفع الذراعين حتى مستوى الكتفين فقط."},"difficulty":"beginner","bodyAreas":["shoulders","back","posture"]},{"id":"warrior-ii","category":"yoga","view":"front","contact":["feet"],"cycleMs":8000,"keyframes":[{"t":0,"pose":{"torso":0,"armL":[5,0],"armR":[5,0],"legL":[3,0],"legR":[3,0]}},{"t":0.35,"pose":{"torso":0,"armL":[88,0],"armR":[88,0],"legL":[60,60],"legR":[42,0]}},{"t":0.7,"pose":{"torso":0,"armL":[88,0],"armR":[88,0],"legL":[60,60],"legR":[42,0]}},{"t":1,"pose":{"torso":0,"armL":[5,0],"armR":[5,0],"legL":[3,0],"legR":[3,0]}}],"muscles":["quads","glutes","shoulders"],"equipment":null,"sets":1,"reps":null,"holdSeconds":30,"name":{"de":"Krieger II","en":"Warrior II","ar":"وضعية المحارب الثانية"},"steps":{"de":["Stell dich mit weit gespreizten Beinen hin. Drehe den einen Fuß nach außen und beuge dieses Knie über dem Knöchel, das andere Bein bleibt gestreckt.","Hebe beide Arme auf Schulterhöhe zur Seite, die Handflächen zeigen nach unten. Der Oberkörper bleibt aufrecht über dem Becken.","Halte einige ruhige Atemzüge und wechsle dann die Seite."],"en":["Stand with the legs wide apart. Turn one foot out and bend that knee over the ankle, keeping the other leg straight.","Raise both arms to shoulder height out to the sides, palms down. The torso stays upright over the pelvis.","Hold for a few calm breaths, then switch sides."],"ar":["قف والساقان متباعدتان. أدر إحدى القدمين للخارج وثنِ هذه الركبة فوق الكاحل وأبقِ الساق الأخرى مستقيمة.","ارفع الذراعين جانباً حتى مستوى الكتفين وراحتاك للأسفل. يبقى الجذع مستقيماً فوق الحوض.","ابقَ بضعة أنفاس هادئة ثم بدّل الجانب."]},"safety":{"de":"Das Knie zeigt in Richtung des Fußes, nie nach innen. Bei Knieschmerzen weniger tief beugen.","en":"The knee points in the direction of the foot, never inward. Bend less deeply with knee pain.","ar":"تتجه الركبة نحو اتجاه القدم وليس للداخل. اثنِ أقل عند ألم الركبة."},"difficulty":"beginner","bodyAreas":["legs","hips","shoulders"]},{"id":"tree-pose","category":"yoga","view":"front","contact":["feet"],"cycleMs":8000,"keyframes":[{"t":0,"pose":{"torso":0,"armL":[5,0],"armR":[5,0],"legL":[3,0],"legR":[3,0]}},{"t":0.35,"pose":{"torso":0,"armL":[15,130],"armR":[15,130],"legL":[30,114],"legR":[2,0]}},{"t":0.7,"pose":{"torso":0,"armL":[15,130],"armR":[15,130],"legL":[30,114],"legR":[2,0]}},{"t":1,"pose":{"torso":0,"armL":[5,0],"armR":[5,0],"legL":[3,0],"legR":[3,0]}}],"muscles":["glutes","quads","abs"],"equipment":null,"sets":1,"reps":null,"holdSeconds":30,"name":{"de":"Baumhaltung","en":"Tree pose","ar":"وضعية الشجرة"},"steps":{"de":["Stell dich auf ein Bein und suche dir einen festen Punkt vor dir.","Setze die Fußsohle des anderen Beins an die Innenseite des Standbeins, unterhalb oder oberhalb des Knies, nie direkt auf das Knie.","Bringe die Handflächen vor der Brust zusammen. Halte ruhig und wechsle die Seite."],"en":["Stand on one leg and find a fixed point in front of you.","Place the sole of the other foot on the inside of the standing leg, below or above the knee, never directly on the knee.","Bring the palms together in front of the chest. Hold calmly and switch sides."],"ar":["قف على ساق واحدة وابحث عن نقطة ثابتة أمامك.","ضع باطن القدم الأخرى على الجهة الداخلية للساق الثابتة أسفل الركبة أو أعلاها وليس على الركبة مباشرة.","ضمّ راحتيك أمام الصدر. اثبت بهدوء ثم بدّل الجانب."]},"safety":{"de":"Steh nahe an einer Wand, falls du wackelst. Bei Schwindel oder unsicherem Stand die Übung auslassen.","en":"Stand near a wall in case you wobble. With dizziness or unsteady balance, skip this exercise.","ar":"قف قرب حائط تحسباً للترنّح. عند الدوخة أو عدم الثبات تجنّب هذا التمرين."},"difficulty":"beginner","bodyAreas":["legs","hips","balance"]},{"id":"standing-side-bend","category":"yoga","view":"front","contact":["feet"],"cycleMs":6000,"keyframes":[{"t":0,"pose":{"torso":0,"armL":[172,0],"armR":[172,0],"legL":[3,0],"legR":[3,0]}},{"t":0.5,"pose":{"torso":22,"armL":[202,0],"armR":[158,0],"legL":[3,0],"legR":[3,0]}},{"t":1,"pose":{"torso":0,"armL":[172,0],"armR":[172,0],"legL":[3,0],"legR":[3,0]}}],"muscles":["obliques","shoulders"],"equipment":null,"sets":1,"reps":8,"holdSeconds":null,"name":{"de":"Stehende Seitneigung","en":"Standing side bend","ar":"الانحناء الجانبي واقفاً"},"steps":{"de":["Stell dich hüftbreit hin und strecke die Arme über den Kopf, die Handflächen zueinander.","Atme aus und neige den Oberkörper langsam zur Seite, als würdest du zwischen zwei Glasscheiben bleiben.","Atme ein und richte dich auf. Wechsle die Seite und bewege dich im Atemrhythmus."],"en":["Stand hip-width apart and stretch the arms overhead, palms facing each other.","Breathe out and lean the torso slowly to the side, as if staying between two panes of glass.","Breathe in and come back up. Switch sides and move with your breath."],"ar":["قف والقدمان بعرض الحوض ومدّ الذراعين فوق الرأس وراحتاك متقابلتان.","أخرج الزفير وأمِل الجذع ببطء إلى الجانب كأنك بين لوحين زجاجيين.","خذ شهيقاً واعد إلى الوضع المستقيم. بدّل الجانب وتحرّك مع نفَسك."]},"safety":{"de":"Nur so weit neigen, wie es angenehm ist. Nicht nach vorn oder hinten kippen. Bei Rückenschmerzen aufhören.","en":"Lean only as far as feels comfortable. Do not tip forward or back. Stop with back pain.","ar":"أمِل بقدر ما هو مريح. لا تنحنِ للأمام أو للخلف. توقّف عند ألم الظهر."},"difficulty":"beginner","bodyAreas":["sides","shoulders","spine"]},{"id":"chair-pose","category":"yoga","view":"side","contact":["feet"],"cycleMs":7000,"keyframes":[{"t":0,"pose":{"torso":0,"armL":[0,0],"armR":[0,0],"legL":[0,0],"legR":[0,0]}},{"t":0.4,"pose":{"torso":32,"armL":[160,0],"armR":[160,0],"legL":[72,102],"legR":[72,102]}},{"t":0.7,"pose":{"torso":32,"armL":[160,0],"armR":[160,0],"legL":[72,102],"legR":[72,102]}},{"t":1,"pose":{"torso":0,"armL":[0,0],"armR":[0,0],"legL":[0,0],"legR":[0,0]}}],"muscles":["quads","glutes","lowerBack"],"equipment":null,"sets":1,"reps":null,"holdSeconds":30,"name":{"de":"Stuhlhaltung","en":"Chair pose","ar":"وضعية الكرسي"},"steps":{"de":["Stell dich aufrecht hin, die Füße hüftbreit.","Beuge die Knie und schiebe die Hüfte nach hinten, als würdest du dich auf einen Stuhl setzen. Die Arme gehen nach oben.","Halte ein paar Atemzüge, das Gewicht auf den Fersen, und komme dann langsam hoch."],"en":["Stand tall with the feet hip-width apart.","Bend the knees and push the hips back as if sitting on a chair. The arms reach up.","Hold for a few breaths with the weight on the heels, then come up slowly."],"ar":["قف مستقيماً والقدمان بعرض الحوض.","ثنِ الركبتين وادفع الحوض للخلف كأنك تجلس على كرسي وارفع الذراعين للأعلى.","ابقَ بضعة أنفاس والوزن على الكعبين ثم قم ببطء."]},"safety":{"de":"Weniger tief beugen bei Knieschmerzen. Die Knie nicht über die Zehen schieben. Nacken lang halten.","en":"Bend less with knee pain. Do not push the knees past the toes. Keep the neck long.","ar":"اثنِ أقل عند ألم الركبة. لا تدفع الركبتين أبعد من الأصابع. أبقِ الرقبة طويلة."},"difficulty":"intermediate","bodyAreas":["legs","glutes","back"]},{"id":"downward-dog","category":"yoga","view":"side","contact":["hands","feet"],"cycleMs":8000,"keyframes":[{"t":0,"pose":{"torso":70.45,"armL":[0,0],"armR":[0,0],"legL":[-70.45,0],"legR":[-70.45,0],"foot":20}},{"t":0.4,"pose":{"torso":127.85,"armL":[45,0],"armR":[45,0],"legL":[-30,0],"legR":[-30,0],"head":32,"foot":60}},{"t":0.7,"pose":{"torso":127.85,"armL":[45,0],"armR":[45,0],"legL":[-30,0],"legR":[-30,0],"head":32,"foot":60}},{"t":1,"pose":{"torso":70.45,"armL":[0,0],"armR":[0,0],"legL":[-70.45,0],"legR":[-70.45,0],"foot":20}}],"muscles":["shoulders","hamstrings","calves"],"equipment":null,"sets":1,"reps":null,"holdSeconds":30,"name":{"de":"Herabschauender Hund","en":"Downward-facing dog","ar":"وضعية الكلب المنحني"},"steps":{"de":["Gehe in den Vierfüßlerstand, die Hände unter den Schultern, die Knie unter der Hüfte.","Stelle die Zehen auf und schiebe die Hüfte nach oben und hinten, bis dein Körper ein umgekehrtes V bildet. Die Knie dürfen gebeugt bleiben.","Drücke die Hände in den Boden, lass den Kopf locker hängen und atme ruhig."],"en":["Come onto hands and knees, hands under the shoulders and knees under the hips.","Tuck the toes and lift the hips up and back until the body forms an upside-down V. The knees may stay bent.","Press the hands into the floor, let the head hang loose and breathe calmly."],"ar":["اجلس على اليدين والركبتين واليدان تحت الكتفين والركبتان تحت الحوض.","ارفع أصابع القدمين وادفع الحوض للأعلى وللخلف حتى يشكّل الجسم حرف V مقلوباً. يمكن إبقاء الركبتين مثنيتين.","اضغط بيديك على الأرض ودع رأسك يتدلى بحرية وتنفّس بهدوء."]},"safety":{"de":"Nicht bei Bluthochdruck, Augenproblemen oder Handgelenkschmerz halten. Bei Schwindel sofort ausruhen.","en":"Do not hold with high blood pressure, eye problems or wrist pain. Rest at once if you feel dizzy.","ar":"لا تثبّتها عند ارتفاع ضغط الدم أو مشكلات العين أو ألم المعصم. ارتح فوراً عند الدوخة."},"difficulty":"beginner","bodyAreas":["shoulders","hamstrings","calves","back"]},{"id":"childs-pose","category":"yoga","view":"side","contact":["knees","hands","feet"],"cycleMs":8000,"keyframes":[{"t":0,"pose":{"torso":71.9,"armL":[0,0],"armR":[0,0],"legL":[0,90],"legR":[0,90],"foot":-90}},{"t":0.4,"pose":{"torso":99.5,"armL":[80,0],"armR":[80,0],"legL":[61.6,151.6],"legR":[61.6,151.6],"foot":-90}},{"t":0.75,"pose":{"torso":99.5,"armL":[80,0],"armR":[80,0],"legL":[61.6,151.6],"legR":[61.6,151.6],"foot":-90}},{"t":1,"pose":{"torso":71.9,"armL":[0,0],"armR":[0,0],"legL":[0,90],"legR":[0,90],"foot":-90}}],"muscles":["lowerBack","glutes"],"equipment":null,"sets":1,"reps":null,"holdSeconds":45,"name":{"de":"Kindhaltung","en":"Child’s pose","ar":"وضعية الطفل"},"steps":{"de":["Knie dich hin, die großen Zehen berühren sich, die Knie sind hüftbreit oder weiter.","Setze dich auf die Fersen und lege den Oberkörper nach vorn ab, die Arme lang nach vorn gestreckt.","Lege die Stirn ab und atme tief in den Rücken. Bleibe, solange es sich gut anfühlt."],"en":["Kneel with the big toes touching and the knees hip-width apart or wider.","Sit back onto the heels and fold the torso forward, arms stretched long in front.","Rest the forehead down and breathe deeply into the back. Stay as long as it feels good."],"ar":["اجلس على ركبتيك وإبهاما القدمين متلامسان والركبتان بعرض الحوض أو أوسع.","اجلس على الكعبين وأمِل الجذع للأمام مع مدّ الذراعين أمامك.","ضع جبهتك على الأرض وتنفّس بعمق نحو الظهر. ابقَ ما دام ذلك مريحاً."]},"safety":{"de":"Bei Knieschmerzen ein Kissen unter Gesäß oder Knie legen. In der Schwangerschaft die Knie weit öffnen.","en":"With knee pain, put a cushion under the buttocks or knees. In pregnancy, open the knees wide.","ar":"عند ألم الركبة ضع وسادة تحت الأرداف أو الركبتين. أثناء الحمل باعد بين الركبتين."},"difficulty":"beginner","bodyAreas":["back","hips","shoulders"]},{"id":"cobra","category":"yoga","view":"side","contact":["hips","hands","feet"],"cycleMs":7000,"keyframes":[{"t":0,"pose":{"torso":68.65,"armL":[-20,110],"armR":[-20,110],"legL":[-84,0],"legR":[-84,0],"foot":-90}},{"t":0.45,"pose":{"torso":31.4,"armL":[-8,25],"armR":[-8,25],"legL":[-84,0],"legR":[-84,0],"foot":-90,"head":-18}},{"t":0.7,"pose":{"torso":31.4,"armL":[-8,25],"armR":[-8,25],"legL":[-84,0],"legR":[-84,0],"foot":-90,"head":-18}},{"t":1,"pose":{"torso":68.65,"armL":[-20,110],"armR":[-20,110],"legL":[-84,0],"legR":[-84,0],"foot":-90}}],"muscles":["lowerBack","upperBack","abs"],"equipment":null,"sets":1,"reps":null,"holdSeconds":20,"name":{"de":"Kobra","en":"Cobra pose","ar":"وضعية الكوبرا"},"steps":{"de":["Lege dich auf den Bauch, die Hände unter den Schultern, die Beine gestreckt.","Atme ein und hebe langsam Kopf und Brust, die Ellenbogen bleiben leicht gebeugt und nah am Körper.","Halte kurz, atme aus und senke dich langsam wieder ab. Der Nacken bleibt lang."],"en":["Lie on your stomach with the hands under the shoulders and the legs extended.","Breathe in and slowly lift the head and chest, elbows slightly bent and close to the body.","Hold briefly, breathe out and lower slowly. Keep the neck long."],"ar":["استلقِ على بطنك واليدان تحت الكتفين والساقان ممدودتان.","خذ شهيقاً وارفع الرأس والصدر ببطء والمرفقان مثنيان قليلاً وقريبان من الجسم.","اثبت لحظة ثم أخرج الزفير وانزل ببطء. أبقِ الرقبة طويلة."]},"safety":{"de":"Nur so hoch, dass es im Rücken nicht zieht oder schmerzt. In der Schwangerschaft und bei Rückenverletzung auslassen.","en":"Lift only as high as it does not pull or hurt in the back. Skip during pregnancy or with a back injury.","ar":"ارفع بقدر ما لا يسبب شدّاً أو ألماً في الظهر. تجنّبه أثناء الحمل أو مع إصابة الظهر."},"difficulty":"beginner","bodyAreas":["back","chest","core"]},{"id":"bird-dog","category":"yoga","view":"side","contact":["hands","knees"],"cycleMs":6000,"keyframes":[{"t":0,"pose":{"torso":71.9,"armL":[0,0],"armR":[0,0],"legL":[0,90],"legR":[0,90],"foot":-90}},{"t":0.4,"pose":{"torso":71.9,"armL":[90,0],"armR":[0,0],"legL":[0,90],"legR":[-90,0],"footL":-90,"footR":30}},{"t":0.6,"pose":{"torso":71.9,"armL":[90,0],"armR":[0,0],"legL":[0,90],"legR":[-90,0],"footL":-90,"footR":30}},{"t":1,"pose":{"torso":71.9,"armL":[0,0],"armR":[0,0],"legL":[0,90],"legR":[0,90],"foot":-90}}],"muscles":["abs","glutes","lowerBack"],"equipment":null,"sets":3,"reps":8,"holdSeconds":null,"name":{"de":"Vierfüßler-Diagonale (Bird Dog)","en":"Bird dog","ar":"الطائر والكلب"},"steps":{"de":["Gehe in den Vierfüßlerstand, die Hände unter den Schultern, die Knie unter der Hüfte, der Rücken ist gerade.","Strecke gleichzeitig einen Arm nach vorn und das gegenüberliegende Bein nach hinten, beide auf Höhe des Rückens.","Halte kurz, führe sie langsam zurück und wechsle die Seite. Die Hüfte bleibt ruhig."],"en":["Come onto hands and knees, hands under the shoulders, knees under the hips, back flat.","At the same time, stretch one arm forward and the opposite leg back, both level with the back.","Hold briefly, bring them back slowly and switch sides. The hips stay still."],"ar":["اجلس على اليدين والركبتين واليدان تحت الكتفين والركبتان تحت الحوض والظهر مستقيم.","مدّ ذراعاً للأمام والساق المقابلة للخلف في الوقت نفسه بمستوى الظهر.","اثبت لحظة ثم أعدهما ببطء وبدّل الجانب. يبقى الحوض ثابتاً."]},"safety":{"de":"Bewege dich langsam und kontrolliert. Bei Handgelenk- oder Rückenschmerzen aufhören.","en":"Move slowly and under control. Stop with wrist or back pain.","ar":"تحرّك ببطء وبتحكّم. توقّف عند ألم المعصم أو الظهر."},"difficulty":"beginner","bodyAreas":["core","back","glutes"]},{"id":"seated-forward-bend","category":"yoga","view":"side","contact":["hips","feet"],"cycleMs":8000,"keyframes":[{"t":0,"pose":{"torso":0,"armL":[30,0],"armR":[30,0],"legL":[84,0],"legR":[84,0],"foot":180}},{"t":0.45,"pose":{"torso":100,"armL":[92,0],"armR":[92,0],"legL":[84,0],"legR":[84,0],"foot":180,"head":10}},{"t":0.7,"pose":{"torso":100,"armL":[92,0],"armR":[92,0],"legL":[84,0],"legR":[84,0],"foot":180,"head":10}},{"t":1,"pose":{"torso":0,"armL":[30,0],"armR":[30,0],"legL":[84,0],"legR":[84,0],"foot":180}}],"muscles":["hamstrings","lowerBack","calves"],"equipment":null,"sets":1,"reps":null,"holdSeconds":30,"name":{"de":"Sitzende Vorwärtsbeuge","en":"Seated forward bend","ar":"الانحناء الأمامي جالساً"},"steps":{"de":["Setze dich aufrecht hin, die Beine nach vorn gestreckt, die Füße aufgestellt.","Atme ein und strecke dich lang, atme aus und beuge dich mit geradem Rücken aus der Hüfte nach vorn.","Lege die Hände auf Beine oder Füße, so weit es angenehm geht, und atme ruhig. Runde den Rücken nicht mit Gewalt."],"en":["Sit tall with the legs stretched out in front and the feet flexed.","Breathe in and grow long, breathe out and fold forward from the hips with a straight back.","Rest the hands on the legs or feet as far as is comfortable and breathe calmly. Do not force the back to round."],"ar":["اجلس مستقيماً والساقان ممدودتان أمامك وأصابع القدمين متجهة للأعلى.","خذ شهيقاً وتمدّد للأعلى ثم أخرج الزفير وانحنِ للأمام من الحوض مع ظهر مستقيم.","ضع يديك على الساقين أو القدمين بقدر ما هو مريح وتنفّس بهدوء. لا تُجبر الظهر على التقوّس."]},"safety":{"de":"Bei Rückenschmerzen oder Ischias die Knie beugen. Nie in die Dehnung ziehen oder wippen.","en":"With back pain or sciatica, bend the knees. Never pull into the stretch or bounce.","ar":"عند ألم الظهر أو عرق النسا اثنِ الركبتين. لا تشدّ داخل التمدد ولا تهتزّ."},"difficulty":"beginner","bodyAreas":["hamstrings","back","calves"]}];
+
+var I18N = {
+  de: {
+    title: "Übungs-Abnahme FLŌ",
+    sub: "26 Bewegungen · Mannequin-Animation + Anleitungstext zur fachlichen Prüfung",
+    info: "Das sind einfache <b>Strichmännchen-Animationen</b> (reine Gelenkwinkel, keine KI, kein Video) — jede Bewegung ist eine Liste von Posen, die sich exakt prüfen lässt. Bekannte technische Grenzen: der Rumpf bleibt starr (keine Wirbelsäulenkrümmung, z.&nbsp;B. bei Katze-Kuh oder tiefer Vorbeuge), es gibt nur eine Seiten- oder eine Frontalansicht, und Vorbeugen in der Frontalansicht wirkt perspektivisch verkürzt. Bitte vor allem bewerten: <b>Ist die Bewegungsabfolge biomechanisch korrekt und sicher? Ist der Anleitungstext richtig? Reichen die Sicherheitshinweise?</b>",
+    progressSuffix: " / 26 geprüft",
+    nameLabel: "Name des Trainers",
+    namePlaceholder: "z. B. Mazen Al-Rashid",
+    noAccount: "Kein Konto, keine App, kein Internet nötig: alles bleibt nur auf diesem Gerät gespeichert.",
+    groups: { strength:"Kraft", hiit:"HIIT", yoga:"Yoga" },
+    diff: { beginner:"Anfänger", intermediate:"Fortgeschritten", advanced:"Profi" },
+    dose: function(ex){
+      if(ex.holdSeconds) return ex.sets + "x " + ex.holdSeconds + " Sek. halten";
+      if(ex.reps) return ex.sets + "x " + ex.reps + " Wdh.";
+      return ex.sets + " Sätze";
+    },
+    equipment: "Kurzhanteln",
+    status: { approved:"Freigegeben", changes:"Änderungen nötig", remove:"Entfernen" },
+    notReviewed: "Nicht geprüft",
+    notesPlaceholder: "Anmerkungen (Pflicht bei Änderungen nötig / Entfernen)",
+    safetyLabel: "Sicherheit:",
+    animPause: "Animation pausieren",
+    animPlay: "Animation abspielen",
+    exportBtn: "Bericht kopieren",
+    exportCopied: "In Zwischenablage kopiert.",
+    exportCopyFailed: "Kopieren nicht möglich — bitte den Text unten manuell markieren und kopieren.",
+    reportTitle: "Übungs-Abnahme FLŌ — Bericht",
+    reportTrainer: "Trainer",
+    reportDate: "Datum",
+    reportNoName: "(kein Name angegeben)",
+    reportNotes: "Anmerkung",
+    confirmTitle: "Abschließende Bestätigung",
+    confirmLabel: "Ich bestätige, dass ich alle Übungen oben geprüft habe und meine Bewertungen korrekt und vollständig sind.",
+    confirmBtn: "Bestätigen & Bericht kopieren",
+    confirmedPrefix: "Bestätigt von",
+    confirmedOn: "am",
+    reportConfirmed: function(name, date){ return "Bestätigung: " + name + " bestätigt am " + date + ", dass diese Bewertungen korrekt und vollständig sind."; },
+    reportNotConfirmed: "Status: Entwurf — noch nicht vom Trainer bestätigt.",
+    locale: "de-DE", dir: "ltr",
+  },
+  en: {
+    title: "FLŌ Exercise Review",
+    sub: "26 movements · mannequin animation + instructions for professional review",
+    info: "These are simple <b>stick-figure animations</b> (pure joint angles, no AI, no video) — every movement is a list of poses that can be checked exactly. Known technical limits: the torso stays rigid (no spine curve, e.g. for cat-cow or a deep forward fold), there is only a side or a front view, and a forward bend in the front view looks foreshortened. Please judge mainly: <b>Is the movement pattern biomechanically correct and safe? Is the instruction text accurate? Are the safety notes enough?</b>",
+    progressSuffix: " / 26 reviewed",
+    nameLabel: "Trainer name",
+    namePlaceholder: "e.g. Mazen Al-Rashid",
+    noAccount: "No account, no app, no internet needed: everything stays only on this device.",
+    groups: { strength:"Strength", hiit:"HIIT", yoga:"Yoga" },
+    diff: { beginner:"Beginner", intermediate:"Intermediate", advanced:"Advanced" },
+    dose: function(ex){
+      if(ex.holdSeconds) return ex.sets + "x " + ex.holdSeconds + "s hold";
+      if(ex.reps) return ex.sets + "x " + ex.reps + " reps";
+      return ex.sets + " sets";
+    },
+    equipment: "Dumbbells",
+    status: { approved:"Approved", changes:"Needs changes", remove:"Remove" },
+    notReviewed: "Not reviewed",
+    notesPlaceholder: "Notes (required for Needs changes / Remove)",
+    safetyLabel: "Safety:",
+    animPause: "Pause animation",
+    animPlay: "Play animation",
+    exportBtn: "Copy report",
+    exportCopied: "Copied to clipboard.",
+    exportCopyFailed: "Could not copy automatically — please select and copy the text below by hand.",
+    reportTitle: "FLŌ Exercise Review — Report",
+    reportTrainer: "Trainer",
+    reportDate: "Date",
+    reportNoName: "(no name given)",
+    reportNotes: "Note",
+    confirmTitle: "Final confirmation",
+    confirmLabel: "I confirm that I have reviewed all the exercises above and my ratings are correct and complete.",
+    confirmBtn: "Confirm & copy report",
+    confirmedPrefix: "Confirmed by",
+    confirmedOn: "on",
+    reportConfirmed: function(name, date){ return "Confirmation: " + name + " confirms on " + date + " that these ratings are correct and complete."; },
+    reportNotConfirmed: "Status: Draft — not yet confirmed by the trainer.",
+    locale: "en-US", dir: "ltr",
+  },
+  ar: {
+    title: "مراجعة تمارين FLŌ",
+    sub: "26 حركة · عرض متحرك تخطيطي ونص إرشادي للمراجعة المهنية",
+    info: "هذه <b>عروض متحركة تخطيطية (شكل عصوي)</b> مبنية فقط على زوايا المفاصل، دون أي ذكاء اصطناعي أو فيديو — كل حركة هي قائمة أوضاع يمكن فحصها بدقة. حدود تقنية معروفة: يبقى الجذع ثابتاً دون انحناء للعمود الفقري (مثل حركات القطة-البقرة أو الانحناء العميق للأمام)، وتتوفر فقط رؤية جانبية أو أمامية، ويظهر الانحناء للأمام في الرؤية الأمامية مختصراً بصرياً. يُرجى التركيز في التقييم على: <b>هل تسلسل الحركة صحيح ميكانيكياً وآمن؟ هل نص الإرشادات دقيق؟ هل تنبيهات السلامة كافية؟</b>",
+    progressSuffix: " من 26 تمت مراجعتها",
+    nameLabel: "اسم المدرّب",
+    namePlaceholder: "مثال: مازن الراشد",
+    noAccount: "لا حاجة لحساب أو تطبيق أو إنترنت: كل شيء يبقى محفوظاً على هذا الجهاز فقط.",
+    groups: { strength:"تمارين القوة", hiit:"تمارين عالية الكثافة (HIIT)", yoga:"يوغا" },
+    diff: { beginner:"مبتدئ", intermediate:"متوسط", advanced:"متقدم" },
+    dose: function(ex){
+      if(ex.holdSeconds) return ex.sets + "× ثبات " + ex.holdSeconds + " ثانية";
+      if(ex.reps) return ex.sets + "× " + ex.reps + " تكرار";
+      return ex.sets + " مجموعات";
+    },
+    equipment: "دمبل",
+    status: { approved:"معتمدة", changes:"تحتاج تعديل", remove:"إزالة" },
+    notReviewed: "لم تتم المراجعة بعد",
+    notesPlaceholder: "ملاحظات (مطلوبة عند \"تحتاج تعديل\" أو \"إزالة\")",
+    safetyLabel: "السلامة:",
+    animPause: "إيقاف الحركة",
+    animPlay: "تشغيل الحركة",
+    exportBtn: "نسخ التقرير",
+    exportCopied: "تم النسخ إلى الحافظة.",
+    exportCopyFailed: "تعذّر النسخ تلقائياً — يرجى تحديد النص أدناه ونسخه يدوياً.",
+    reportTitle: "مراجعة تمارين FLŌ — تقرير",
+    reportTrainer: "المدرّب",
+    reportDate: "التاريخ",
+    reportNoName: "(لم يُدخل اسم)",
+    reportNotes: "ملاحظة",
+    confirmTitle: "تأكيد نهائي",
+    confirmLabel: "أؤكد أنني راجعت جميع التمارين أعلاه وأن تقييماتي صحيحة وكاملة.",
+    confirmBtn: "تأكيد ونسخ التقرير",
+    confirmedPrefix: "تم التأكيد من قِبل",
+    confirmedOn: "بتاريخ",
+    reportConfirmed: function(name, date){ return "تأكيد: يؤكد " + name + " بتاريخ " + date + " أن هذه التقييمات صحيحة وكاملة."; },
+    reportNotConfirmed: "الحالة: مسودة — لم يتم التأكيد من المدرّب بعد.",
+    locale: "ar-SA", dir: "rtl",
+  },
+};
+var GROUP_ORDER = ["strength","hiit","yoga"];
+var currentLang = "de";
+function t(){ return I18N[currentLang] }
+
+// ---------------------------------------------------------------- engine (ported 1:1 from src/features/exercise-anim/engine.ts)
+var BODY = { torso:58, neck:6, headR:11, upperArm:32, forearm:28, hand:4, thigh:42, shin:40, foot:14, hipHalf:9, shoulderHalf:17 };
+var CANVAS = { width:300, height:270, floorY:236, centerX:150 };
+function rad(d){ return d*Math.PI/180 }
+function fromDown(d){ return { x:Math.sin(rad(d)), y:Math.cos(rad(d)) } }
+function padd(a,b,scale){ scale = scale===undefined?1:scale; return { x:a.x+b.x*scale, y:a.y+b.y*scale } }
+function lowerAngle(view,kind,upper,flex){ if(view==="side") return kind==="arm" ? upper+flex : upper-flex; return upper-flex }
+
+function rawJoints(pose, view){
+  var pelvis = { x: pose.x||0, y:0 };
+  var lean = rad(pose.torso);
+  var up = { x:Math.sin(lean), y:-Math.cos(lean) };
+  var shoulderCenter = padd(pelvis, up, BODY.torso);
+  var headAng = rad(pose.torso + (pose.head||0));
+  var headDir = { x:Math.sin(headAng), y:-Math.cos(headAng) };
+  var head = padd(shoulderCenter, headDir, BODY.neck + BODY.headR);
+  var across = { x:Math.cos(lean), y:Math.sin(lean) };
+  var sides = view==="side" ? [0,0] : [-1,1];
+  var shoulder = sides.map(function(s){ return padd(shoulderCenter, across, s*BODY.shoulderHalf) });
+  var hip = sides.map(function(s){ return padd(pelvis, {x:1,y:0}, s*BODY.hipHalf) });
+
+  function limb(root, pair, side, kind){
+    var upper = pair[0], flex = pair[1];
+    var mirror = view==="front" ? (side===0?1:side) : 1;
+    var first = padd(root, fromDown(upper*mirror), kind==="arm"?BODY.upperArm:BODY.thigh);
+    var second = padd(first, fromDown(lowerAngle(view,kind,upper,flex)*mirror), kind==="arm"?BODY.forearm:BODY.shin);
+    return [first, second];
+  }
+
+  var arms = [pose.armL, pose.armR], legs = [pose.legL, pose.legR];
+  var elbow=[], hand=[], knee=[], ankle=[], toe=[];
+  for(var i=0;i<2;i++){
+    var side = sides[i];
+    var ea = limb(shoulder[i], arms[i], side, "arm");
+    var la = limb(hip[i], legs[i], side, "leg");
+    elbow.push(ea[0]); hand.push(ea[1]); knee.push(la[0]); ankle.push(la[1]);
+    var footAngle = (i===0 ? pose.footL : pose.footR); if(footAngle===undefined) footAngle = pose.foot!==undefined?pose.foot:90;
+    var mirror = view==="front" ? (side===0?1:side) : 1;
+    toe.push(padd(ankle[i], fromDown(footAngle*mirror), BODY.foot));
+  }
+  return { pelvis:pelvis, shoulderCenter:shoulderCenter, head:head, shoulder:shoulder, elbow:elbow, hand:hand, hip:hip, knee:knee, ankle:ankle, toe:toe };
+}
+
+function contactPoints(joints, contact){
+  var pts = [];
+  if(contact.indexOf("feet")>=0) pts = pts.concat(joints.ankle, joints.toe);
+  if(contact.indexOf("hands")>=0) pts = pts.concat(joints.hand);
+  if(contact.indexOf("knees")>=0) pts = pts.concat(joints.knee);
+  if(contact.indexOf("hips")>=0) pts.push({x:joints.pelvis.x, y:joints.pelvis.y+9});
+  if(contact.indexOf("shoulders")>=0) pts.push({x:joints.shoulderCenter.x, y:joints.shoulderCenter.y+9});
+  return pts;
+}
+
+function solve(pose, view, contact){
+  var raw = rawJoints(pose, view);
+  var lowest = Math.max.apply(null, contactPoints(raw, contact).map(function(p){return p.y}));
+  var dy = CANVAS.floorY - lowest - (pose.lift||0);
+  var dx = CANVAS.centerX;
+  function mv(p){ return { x:p.x+dx, y:p.y+dy } }
+  function pair(p){ return [mv(p[0]), mv(p[1])] }
+  return {
+    pelvis:mv(raw.pelvis), shoulderCenter:mv(raw.shoulderCenter), head:mv(raw.head),
+    shoulder:pair(raw.shoulder), elbow:pair(raw.elbow), hand:pair(raw.hand),
+    hip:pair(raw.hip), knee:pair(raw.knee), ankle:pair(raw.ankle), toe:pair(raw.toe),
+  };
+}
+
+function smooth(u){ return u*u*(3-2*u) }
+function mix(a,b,u){ return a+(b-a)*u }
+function mixLimb(a,b,u){ return [mix(a[0],b[0],u), mix(a[1],b[1],u)] }
+
+function blend(a,b,u){
+  return {
+    torso: mix(a.torso,b.torso,u),
+    head: mix(a.head||0, b.head||0, u),
+    x: mix(a.x||0, b.x||0, u),
+    lift: mix(a.lift||0, b.lift||0, u),
+    foot: mix(a.foot!==undefined?a.foot:90, b.foot!==undefined?b.foot:90, u),
+    footL: mix(a.footL!==undefined?a.footL:(a.foot!==undefined?a.foot:90), b.footL!==undefined?b.footL:(b.foot!==undefined?b.foot:90), u),
+    footR: mix(a.footR!==undefined?a.footR:(a.foot!==undefined?a.foot:90), b.footR!==undefined?b.footR:(b.foot!==undefined?b.foot:90), u),
+    armL: mixLimb(a.armL,b.armL,u), armR: mixLimb(a.armR,b.armR,u),
+    legL: mixLimb(a.legL,b.legL,u), legR: mixLimb(a.legR,b.legR,u),
+  };
+}
+
+function poseAt(keyframes, t){
+  var clamped = Math.min(Math.max(t,0),1);
+  for(var i=1;i<keyframes.length;i++){
+    var prev = keyframes[i-1], next = keyframes[i];
+    if(clamped <= next.t){
+      var span = next.t - prev.t;
+      return blend(prev.pose, next.pose, span<=0?1:smooth((clamped-prev.t)/span));
+    }
+  }
+  return keyframes[keyframes.length-1].pose;
+}
+
+// ---------------------------------------------------------------- figure rendering (ported from ExerciseFigure.tsx)
+var SVGNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs){
+  var n = document.createElementNS(SVGNS, tag);
+  for(var k in attrs) n.setAttribute(k, attrs[k]);
+  return n;
+}
+function lerpPt(a,b,u){ return { x:a.x+(b.x-a.x)*u, y:a.y+(b.y-a.y)*u } }
+function lineEl(seg, color, from, to, width, opacity){
+  from = from===undefined?0:from; to = to===undefined?1:to; width = width===undefined?seg.width:width; opacity = opacity===undefined?1:opacity;
+  var a = lerpPt(seg.a, seg.b, from), b = lerpPt(seg.a, seg.b, to);
+  return el("line", { x1:a.x, y1:a.y, x2:b.x, y2:b.y, stroke:color, "stroke-width":width, "stroke-linecap":"round", opacity:opacity });
+}
+function highlights(j, muscles, frontView, near){
+  var torso = { a:j.pelvis, b:j.shoulderCenter, width: frontView?30:24 };
+  function upperArm(i){ return { a:j.shoulder[i], b:j.elbow[i], width:9 } }
+  function forearm(i){ return { a:j.elbow[i], b:j.hand[i], width:8 } }
+  function thigh(i){ return { a:j.hip[i], b:j.knee[i], width:13 } }
+  function shin(i){ return { a:j.knee[i], b:j.ankle[i], width:10 } }
+  var out = [];
+  function on(seg, from, to){ out.push(lineEl(seg, "var(--muscle)", from, to, seg.width*0.78, 0.95)) }
+  for(var mi=0; mi<muscles.length; mi++){
+    var m = muscles[mi];
+    for(var ni=0; ni<near.length; ni++){
+      var i = near[ni];
+      if(m==="biceps"||m==="triceps") on(upperArm(i), 0.14, 0.86);
+      if(m==="forearms") on(forearm(i), 0.12, 0.88);
+      if(m==="quads"||m==="hamstrings") on(thigh(i), 0.12, 0.88);
+      if(m==="calves") on(shin(i), 0.15, 0.85);
+      if(m==="shoulders") out.push(el("circle",{cx:j.shoulder[i].x, cy:j.shoulder[i].y, r:9, fill:"var(--muscle)", opacity:0.95}));
+    }
+    if(m==="chest"||m==="upperBack") on(torso, 0.5, 0.92);
+    if(m==="abs"||m==="obliques"||m==="lowerBack") on(torso, 0.08, 0.5);
+    if(m==="glutes"||m==="hipFlexors") out.push(el("circle",{cx:j.pelvis.x, cy:j.pelvis.y, r:frontView?10:12, fill:"var(--muscle)", opacity:0.95}));
+  }
+  return out;
+}
+function dumbbellEls(hand, forearmFrom){
+  var dx = hand.x-forearmFrom.x, dy = hand.y-forearmFrom.y;
+  var len = Math.hypot(dx,dy) || 1;
+  var nx = -dy/len, ny = dx/len, bar = 9;
+  var a = { x:hand.x+nx*bar, y:hand.y+ny*bar }, b = { x:hand.x-nx*bar, y:hand.y-ny*bar };
+  var out = [];
+  out.push(el("line",{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:"#94A3B8","stroke-width":3,"stroke-linecap":"round"}));
+  out.push(el("line",{x1:a.x+nx*1,y1:a.y+ny*1,x2:a.x-nx*5,y2:a.y-ny*5,stroke:"#64748B","stroke-width":9,"stroke-linecap":"round"}));
+  out.push(el("line",{x1:b.x-nx*1,y1:b.y-ny*1,x2:b.x+nx*5,y2:b.y+ny*5,stroke:"#64748B","stroke-width":9,"stroke-linecap":"round"}));
+  return out;
+}
+function buildFigure(svg, move, pose){
+  var j = solve(pose, move.view, move.contact);
+  var front = move.view === "front";
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+  svg.setAttribute("viewBox", "0 0 " + CANVAS.width + " " + CANVAS.height);
+
+  function armEls(i, color){
+    var g = el("g", {});
+    g.appendChild(lineEl({a:j.shoulder[i], b:j.elbow[i], width:9}, color));
+    g.appendChild(lineEl({a:j.elbow[i], b:j.hand[i], width:8}, color));
+    g.appendChild(el("circle",{cx:j.hand[i].x, cy:j.hand[i].y, r:BODY.hand, fill:color}));
+    return g;
+  }
+  function legEls(i, color){
+    var g = el("g", {});
+    g.appendChild(lineEl({a:j.hip[i], b:j.knee[i], width:13}, color));
+    g.appendChild(lineEl({a:j.knee[i], b:j.ankle[i], width:10}, color));
+    g.appendChild(lineEl({a:j.ankle[i], b:j.toe[i], width:6}, color));
+    return g;
+  }
+  var farColor = front ? "var(--figure)" : "var(--figure-far)";
+  var near = front ? [0,1] : [0];
+
+  svg.appendChild(lineEl({a:{x:20,y:CANVAS.floorY+4}, b:{x:CANVAS.width-20,y:CANVAS.floorY+4}, width:3}, "var(--border)"));
+  svg.appendChild(armEls(1, farColor));
+  svg.appendChild(legEls(1, farColor));
+  svg.appendChild(lineEl({a:j.pelvis, b:j.shoulderCenter, width: front?30:24}, "var(--figure)"));
+  svg.appendChild(el("circle",{cx:j.head.x, cy:j.head.y, r:BODY.headR, fill:"var(--figure)"}));
+  svg.appendChild(legEls(0, "var(--figure)"));
+  svg.appendChild(armEls(0, "var(--figure)"));
+  highlights(j, move.muscles, front, near).forEach(function(n){ svg.appendChild(n) });
+  if(move.equipment==="dumbbell"){ near.forEach(function(i){ dumbbellEls(j.hand[i], j.elbow[i]).forEach(function(n){svg.appendChild(n)}) }) }
+}
+
+// ---------------------------------------------------------------- local-only state (no account, no app, no hosting)
+var STORE_KEY = "flo-trainer-review-v3";
+var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+var playing = !reduceMotion;
+var startTimes = {};
+var svgRefs = {};
+var reviewerName = "";
+var items = {}; // id -> { status, notes }
+var confirmed = false;
+var confirmedAt = null;
+
+function loadStore(){
+  try{
+    var raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return;
+    var parsed = JSON.parse(raw);
+    if(parsed && typeof parsed === "object"){
+      reviewerName = parsed.reviewerName || "";
+      items = parsed.items || {};
+      confirmed = !!parsed.confirmed;
+      confirmedAt = parsed.confirmedAt || null;
+      if(parsed.lang && I18N[parsed.lang]) currentLang = parsed.lang;
+    }
+  }catch(e){}
+}
+var saveTimer = null;
+function saveStore(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function(){
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify({ reviewerName:reviewerName, items:items, lang:currentLang, confirmed:confirmed, confirmedAt:confirmedAt })) }catch(e){}
+  }, 250);
+}
+
+function reviewedCount(){
+  var n = 0;
+  for(var id in items){ if(items[id] && items[id].status) n++ }
+  return n;
+}
+
+function invalidateConfirm(){
+  if(confirmed){ confirmed = false; confirmedAt = null; saveStore(); updateConfirmUI() }
+}
+
+function buildCard(ex){
+  var L = t();
+  var card = document.createElement("div");
+  card.className = "card ex-card";
+  card.id = "card-" + ex.id;
+
+  var head = document.createElement("div");
+  head.className = "ex-head";
+  var titleWrap = document.createElement("div");
+  titleWrap.className = "ex-title-wrap";
+  var h = document.createElement("p"); h.className = "ex-name"; h.textContent = ex.name[currentLang];
+  var idp = document.createElement("div"); idp.className = "ex-id"; idp.textContent = ex.id;
+  var tags = document.createElement("div"); tags.className = "tags";
+  var t1 = document.createElement("span"); t1.className = "tag diff"; t1.textContent = L.diff[ex.difficulty] || ex.difficulty;
+  var t2 = document.createElement("span"); t2.className = "tag"; t2.textContent = L.dose(ex);
+  tags.appendChild(t1); tags.appendChild(t2);
+  ex.bodyAreas.slice(0,3).forEach(function(a){ var tg=document.createElement("span"); tg.className="tag"; tg.textContent=a; tags.appendChild(tg) });
+  if(ex.equipment==="dumbbell"){ var te=document.createElement("span"); te.className="tag"; te.textContent=L.equipment; tags.appendChild(te) }
+  titleWrap.appendChild(h); titleWrap.appendChild(idp); titleWrap.appendChild(tags);
+  var cur = items[ex.id] || {};
+  var pill = document.createElement("span"); pill.className = "status-pill"; pill.id = "pill-" + ex.id;
+  pill.textContent = cur.status ? L.status[cur.status] : L.notReviewed;
+  if(cur.status) pill.setAttribute("data-s", cur.status);
+  head.appendChild(titleWrap); head.appendChild(pill);
+
+  var body = document.createElement("div");
+  body.className = "body-row";
+  var figBox = document.createElement("div"); figBox.className = "figure-box";
+  var svg = el("svg", {});
+  figBox.appendChild(svg);
+  svgRefs[ex.id] = { svg: svg, move: ex };
+
+  var steps = document.createElement("div"); steps.className = "steps";
+  var ol = document.createElement("ol");
+  ex.steps[currentLang].forEach(function(s){ var li=document.createElement("li"); li.textContent=s; ol.appendChild(li) });
+  var safety = document.createElement("div"); safety.className = "safety";
+  var sb = document.createElement("b"); sb.textContent = L.safetyLabel;
+  var sspan = document.createElement("span"); sspan.textContent = ex.safety[currentLang];
+  safety.appendChild(sb); safety.appendChild(sspan);
+  steps.appendChild(ol); steps.appendChild(safety);
+
+  body.appendChild(figBox); body.appendChild(steps);
+
+  var review = document.createElement("div");
+  review.className = "review";
+  var seg = document.createElement("div"); seg.className = "seg"; seg.setAttribute("role","radiogroup");
+  ["approved","changes","remove"].forEach(function(s){
+    var b = document.createElement("button");
+    b.type = "button"; b.dataset.s = s; b.setAttribute("role","radio");
+    b.setAttribute("aria-pressed", String(cur.status===s));
+    b.textContent = (s==="approved"?"✓ ":s==="changes"?"✎ ":"✕ ") + L.status[s];
+    b.addEventListener("click", function(){ setStatus(ex.id, s) });
+    seg.appendChild(b);
+  });
+  var notes = document.createElement("textarea");
+  notes.className = "notes"; notes.id = "notes-" + ex.id;
+  notes.placeholder = L.notesPlaceholder;
+  notes.value = cur.notes || "";
+  notes.addEventListener("input", function(){
+    var it = items[ex.id] || {}; it.notes = notes.value; items[ex.id] = it;
+    saveStore(); invalidateConfirm(); renderReport();
+  });
+  review.appendChild(seg); review.appendChild(notes);
+
+  card.appendChild(head); card.appendChild(body); card.appendChild(review);
+  return card;
+}
+
+function setStatus(id, status){
+  var it = items[id] || {};
+  it.status = it.status === status ? undefined : status; // click again to clear
+  items[id] = it;
+  var card = document.getElementById("card-" + id);
+  card.querySelectorAll(".seg button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.s===it.status)) });
+  var pill = document.getElementById("pill-" + id);
+  var L = t();
+  if(it.status){ pill.textContent = L.status[it.status]; pill.setAttribute("data-s", it.status) }
+  else { pill.textContent = L.notReviewed; pill.removeAttribute("data-s") }
+  saveStore();
+  invalidateConfirm();
+  updateProgress();
+  renderReport();
+}
+
+function updateProgress(){
+  var n = reviewedCount();
+  document.getElementById("progNum").textContent = String(n);
+  document.getElementById("barFill").style.width = Math.round((n/26)*100) + "%";
+}
+
+function renderGroups(){
+  var L = t();
+  var container = document.getElementById("groups");
+  container.innerHTML = "";
+  svgRefs = {};
+  GROUP_ORDER.forEach(function(g){
+    var exList = EXERCISES.filter(function(e){ return e.category===g });
+    if(!exList.length) return;
+    var title = document.createElement("div"); title.className = "group-title"; title.textContent = L.groups[g] + " · " + exList.length;
+    container.appendChild(title);
+    var grid = document.createElement("div"); grid.className = "grid";
+    exList.forEach(function(ex){ grid.appendChild(buildCard(ex)) });
+    container.appendChild(grid);
+  });
+  for(var id2 in svgRefs) svgRefs[id2].drawnStatic = false;
+}
+
+function buildReportText(){
+  var L = t();
+  var lines = [];
+  lines.push(L.reportTitle);
+  lines.push(L.reportTrainer + ": " + (reviewerName.trim() || L.reportNoName));
+  lines.push(L.reportDate + ": " + new Date().toLocaleString(L.locale));
+  lines.push("");
+  GROUP_ORDER.forEach(function(g){
+    var exList = EXERCISES.filter(function(e){ return e.category===g });
+    if(!exList.length) return;
+    lines.push("== " + L.groups[g] + " ==");
+    exList.forEach(function(ex){
+      var it = items[ex.id] || {};
+      var statusLabel = it.status ? L.status[it.status] : L.notReviewed;
+      lines.push("- " + ex.name[currentLang] + " (" + ex.id + "): " + statusLabel);
+      if(it.notes && it.notes.trim()) lines.push("  " + L.reportNotes + ": " + it.notes.trim());
+    });
+    lines.push("");
+  });
+  if(confirmed){
+    lines.push(L.reportConfirmed(reviewerName.trim() || L.reportNoName, new Date(confirmedAt).toLocaleString(L.locale)));
+  } else {
+    lines.push(L.reportNotConfirmed);
+  }
+  return lines.join("\n");
+}
+
+function renderReport(){
+  document.getElementById("reportBox").value = buildReportText();
+}
+
+function doExport(){
+  var L = t();
+  var text = buildReportText();
+  var hint = document.getElementById("exportHint");
+  var box = document.getElementById("reportBox");
+  box.value = text;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){
+      hint.textContent = L.exportCopied;
+    }).catch(function(){
+      hint.textContent = L.exportCopyFailed;
+      box.focus(); box.select();
+    });
+  } else {
+    hint.textContent = L.exportCopyFailed;
+    box.focus(); box.select();
+  }
+}
+
+function updateConfirmUI(){
+  var L = t();
+  var chk = document.getElementById("confirmCheck");
+  var btn = document.getElementById("confirmBtn");
+  var status = document.getElementById("confirmStatus");
+  chk.checked = confirmed;
+  chk.disabled = confirmed;
+  btn.disabled = confirmed || !chk.checked || !reviewerName.trim();
+  status.textContent = confirmed
+    ? (L.confirmedPrefix + " " + (reviewerName.trim() || L.reportNoName) + " " + L.confirmedOn + " " + new Date(confirmedAt).toLocaleString(L.locale))
+    : "";
+}
+
+function applyStaticTexts(){
+  var L = t();
+  document.getElementById("pageTitle").textContent = L.title;
+  document.getElementById("pageSub").textContent = L.sub;
+  document.getElementById("infoBox").innerHTML = L.info;
+  document.getElementById("progSuffix").textContent = L.progressSuffix;
+  document.getElementById("nameLabel").textContent = L.nameLabel;
+  document.getElementById("reviewerName").placeholder = L.namePlaceholder;
+  document.getElementById("animToggle").textContent = playing ? L.animPause : L.animPlay;
+  document.getElementById("exportBtn").textContent = L.exportBtn;
+  document.getElementById("exportHint").textContent = "";
+  document.getElementById("noAccountNote").textContent = L.noAccount;
+  document.getElementById("confirmTitle").textContent = L.confirmTitle;
+  document.getElementById("confirmLabel").textContent = L.confirmLabel;
+  document.getElementById("confirmBtn").textContent = L.confirmBtn;
+}
+
+function setLang(lang){
+  currentLang = lang;
+  saveStore();
+  document.documentElement.setAttribute("dir", I18N[lang].dir);
+  document.documentElement.setAttribute("lang", lang);
+  document.querySelectorAll("#langsw button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.lang===lang)) });
+  applyStaticTexts();
+  renderGroups();
+  updateProgress();
+  renderReport();
+  updateConfirmUI();
+}
+
+// ---------------------------------------------------------------- animation loop
+var lastFrame = 0;
+function tick(now){
+  if(playing && now - lastFrame > 40){
+    lastFrame = now;
+    for(var id in svgRefs){
+      var ref = svgRefs[id];
+      if(startTimes[id]===undefined) startTimes[id] = now;
+      var frac = ((now - startTimes[id]) % ref.move.cycleMs) / ref.move.cycleMs;
+      buildFigure(ref.svg, ref.move, poseAt(ref.move.keyframes, frac));
+    }
+  } else if(!playing){
+    for(var id2 in svgRefs){
+      var r2 = svgRefs[id2];
+      if(!r2.drawnStatic){ buildFigure(r2.svg, r2.move, poseAt(r2.move.keyframes, 0.5)); r2.drawnStatic = true }
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+// ---------------------------------------------------------------- boot
+function start(){
+  loadStore();
+  document.querySelectorAll("#langsw button").forEach(function(b){
+    b.addEventListener("click", function(){ setLang(b.dataset.lang) });
+  });
+  document.documentElement.setAttribute("dir", I18N[currentLang].dir);
+  document.documentElement.setAttribute("lang", currentLang);
+  document.querySelectorAll("#langsw button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.lang===currentLang)) });
+
+  var nameEl = document.getElementById("reviewerName");
+  nameEl.value = reviewerName;
+  nameEl.addEventListener("input", function(){
+    reviewerName = nameEl.value; saveStore(); invalidateConfirm(); renderReport(); updateConfirmUI();
+  });
+
+  document.getElementById("animToggle").addEventListener("click", function(){
+    playing = !playing;
+    document.getElementById("animToggle").textContent = playing ? t().animPause : t().animPlay;
+    if(playing) for(var k in svgRefs) svgRefs[k].drawnStatic = false;
+  });
+
+  document.getElementById("exportBtn").addEventListener("click", doExport);
+
+  document.getElementById("confirmCheck").addEventListener("change", function(){
+    var chk = document.getElementById("confirmCheck");
+    document.getElementById("confirmBtn").disabled = confirmed || !chk.checked || !reviewerName.trim();
+  });
+  document.getElementById("confirmBtn").addEventListener("click", function(){
+    if(!reviewerName.trim() || !document.getElementById("confirmCheck").checked) return;
+    confirmed = true;
+    confirmedAt = new Date().toISOString();
+    saveStore();
+    updateConfirmUI();
+    doExport();
+  });
+
+  applyStaticTexts();
+  renderGroups();
+  updateProgress();
+  renderReport();
+  updateConfirmUI();
+  requestAnimationFrame(tick);
+}
+
+start();
+})();
+</script>
+</body>
+</html>
